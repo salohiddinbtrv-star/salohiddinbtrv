@@ -5,19 +5,25 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>💰 Moliyaviy Reja Tuzish</h1>
+
+<div class="container">
+    <h1>💰 Smart Budget Planner</h1>
 
     <form action="/calculate" method="post">
-        <input type="number" name="income" placeholder="Oylik daromad" required>
-        <input type="number" name="expenses" placeholder="Oylik xarajat" required>
-        <input type="number" name="savings_goal" placeholder="Tejash maqsadi" required>
+        <input type="number" name="income" placeholder="Oylik daromad (so'm)" required>
+        <input type="number" name="expenses" placeholder="Oylik xarajat (so'm)" required>
+        <input type="number" name="savings_goal" placeholder="Tejash maqsadi (so'm)" required>
         <button type="submit">Hisoblash</button>
     </form>
 
     {% if remaining %}
-        <h2>Qolgan pul: {{ remaining }}</h2>
-        <h2>Har oy yig‘ish kerak: {{ monthly_needed }}</h2>
-        <h3>{{ advice }}</h3>
+    <div class="result">
+        <h3>💵 Qolgan pul: {{ remaining }} so'm</h3>
+        <h3>📈 Har oy yig‘ish kerak: {{ monthly_needed }} so'm</h3>
+        <div class="advice">{{ advice }}</div>
+    </div>
     {% endif %}
+</div>
+
 </body>
 </html>
