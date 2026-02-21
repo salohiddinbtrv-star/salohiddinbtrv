@@ -1,28 +1,48 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Moliyaviy Savodxonlik</title>
+    <title>Smart Finance App</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-<div class="container">
-    <h1>💰 Smart Budget Planner</h1>
+<div class="app">
 
-    <form action="/calculate" method="post">
-        <input type="number" name="income" placeholder="Oylik daromad (so'm)" required>
-        <input type="number" name="expenses" placeholder="Oylik xarajat (so'm)" required>
-        <input type="number" name="savings_goal" placeholder="Tejash maqsadi (so'm)" required>
-        <button type="submit">Hisoblash</button>
-    </form>
+    <div class="header">
+        <h1>💰 Smart Finance Dashboard</h1>
+        <p>Yoshlar uchun moliyaviy boshqaruv tizimi</p>
+    </div>
+
+    <div class="card">
+        <form action="/calculate" method="post">
+            <div class="grid">
+                <input type="number" name="income" placeholder="Oylik daromad (so'm)" required>
+                <input type="number" name="expenses" placeholder="Oylik xarajat (so'm)" required>
+            </div>
+            <input type="number" name="savings_goal" placeholder="Tejash maqsadi (so'm)" required>
+            <button type="submit">Hisoblash</button>
+        </form>
+    </div>
 
     {% if remaining %}
-    <div class="result">
-        <h3>💵 Qolgan pul: {{ remaining }} so'm</h3>
-        <h3>📈 Har oy yig‘ish kerak: {{ monthly_needed }} so'm</h3>
-        <div class="advice">{{ advice }}</div>
+    <div class="card">
+        <div class="result-box">
+            <div class="result-item">
+                <h3>Qolgan mablag'</h3>
+                <p>{{ remaining }} so'm</p>
+            </div>
+            <div class="result-item">
+                <h3>Har oy yig‘ish</h3>
+                <p>{{ monthly_needed }} so'm</p>
+            </div>
+        </div>
+
+        <div class="advice">
+            {{ advice }}
+        </div>
     </div>
     {% endif %}
+
 </div>
 
 </body>
