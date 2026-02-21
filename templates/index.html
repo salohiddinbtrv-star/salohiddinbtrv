@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Moliyaviy Savodxonlik</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>💰 Moliyaviy Reja Tuzish</h1>
+
+    <form action="/calculate" method="post">
+        <input type="number" name="income" placeholder="Oylik daromad" required>
+        <input type="number" name="expenses" placeholder="Oylik xarajat" required>
+        <input type="number" name="savings_goal" placeholder="Tejash maqsadi" required>
+        <button type="submit">Hisoblash</button>
+    </form>
+
+    {% if remaining %}
+        <h2>Qolgan pul: {{ remaining }}</h2>
+        <h2>Har oy yig‘ish kerak: {{ monthly_needed }}</h2>
+        <h3>{{ advice }}</h3>
+    {% endif %}
+</body>
+</html>
