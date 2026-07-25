@@ -5,3 +5,4 @@ gevent
 gevent-websocket
 groq
 python-dotenv
+eventlet
