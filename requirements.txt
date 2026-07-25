@@ -3,4 +3,4 @@ flask-socketio
 python-dotenv
 groq
 gunicorn
-eventlet
+eventlet==0.33.3
