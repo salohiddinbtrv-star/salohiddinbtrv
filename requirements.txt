@@ -1,8 +1,6 @@
 flask
 flask-socketio
-gunicorn
-gevent
-gevent-websocket
-groq
 python-dotenv
+groq
+gunicorn
 eventlet
