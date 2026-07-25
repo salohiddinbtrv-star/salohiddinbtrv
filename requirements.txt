@@ -1,6 +1,6 @@
 flask
-flask-socketio
+flask-socketio==5.3.6
 python-dotenv
 groq
-gunicorn
+gunicorn==21.2.0
 eventlet==0.33.3
