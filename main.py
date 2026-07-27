@@ -1,6 +1,4 @@
 import os
-import subprocess
-import time
 from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
@@ -10,7 +8,7 @@ from groq import Groq
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'notfic_secret_key_123'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'notfic_secret_key_123')
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Groq AI mijozini ishga tushirish
@@ -58,14 +56,5 @@ def handle_message(data):
         emit('response_message', {'username': 'Notfic AI ⚡', 'message': ai_reply}, broadcast=True)
 
 if __name__ == '__main__':
-    # LocalTunnel orqali parolsiz va ro'yxatdan o'tmasdan internetga chiqarish
-    try:
-        subprocess.Popen("lt --port 5000", shell=True)
-        print("\n==========================================")
-        print("🚀 NOTFIC SERVERI ISHGA TUSHDI!")
-        print("Internet havolasini olish uchun buyruq satrini kuzating.")
-        print("==========================================\n")
-    except Exception as e:
-        print("Tunnelni ochishda xatolik:", e)
-
-    socketio.run(app, debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
