@@ -1,77 +1,228 @@
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #0f172a;
-    color: #f8fafc;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
+:root,
+html[data-theme="light"] {
+    --bg: #FAFAF8;
+    --sidebar-bg: #F3F1EA;
+    --panel: #FFFFFF;
+    --ink: #1F1E1D;
+    --ink-soft: #83807A;
+    --border: #E8E5DE;
+    --accent: #C15F3C;
+    --user-bubble: #F0EEE6;
+    --hover: rgba(31,30,29,0.05);
 }
 
-.chat-container {
-    width: 90%;
-    max-width: 600px;
-    height: 80vh;
-    background: #1e293b;
-    border-radius: 12px;
+html[data-theme="dark"] {
+    --bg: #1A1918;
+    --sidebar-bg: #211F1D;
+    --panel: #262422;
+    --ink: #F2F0EC;
+    --ink-soft: #94908A;
+    --border: #38352F;
+    --accent: #E07A54;
+    --user-bubble: #322E2A;
+    --hover: rgba(255,255,255,0.06);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    height: 100%;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+}
+
+.app { height: 100vh; display: flex; }
+
+/* ---------- CHAP YON PANEL ---------- */
+.sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    overflow: hidden;
+    padding: 18px 14px;
 }
 
-.chat-header {
-    padding: 15px 20px;
-    background: #0f172a;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #334155;
+.sidebar-brand {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 600; font-size: 15px;
+    padding: 6px 8px 20px;
 }
 
-.status { color: #22c55e; font-size: 14px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+.new-chat-btn {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--panel); color: var(--ink);
+    font-family: inherit; font-size: 13.5px; font-weight: 500;
+    cursor: pointer; margin-bottom: 18px;
+}
+
+.new-chat-btn:hover { background: var(--hover); }
+
+.sidebar-section { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+
+.sidebar-label {
+    font-size: 11px; font-weight: 600; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 0 8px 8px;
+}
+
+.chat-list { display: flex; flex-direction: column; gap: 2px; }
+
+.sidebar-empty { padding: 8px; font-size: 13px; color: var(--ink-soft); }
+
+.sidebar-link, .chat-item {
+    display: block; padding: 9px 10px; border-radius: 8px;
+    color: var(--ink); text-decoration: none; font-size: 13.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.sidebar-link:hover, .chat-item:hover { background: var(--hover); }
+.chat-item.active { background: var(--panel); font-weight: 500; }
+
+.sidebar-footer { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+.username-input {
+    width: 100%; font-family: inherit; font-size: 13px;
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); color: var(--ink); outline: none;
+}
+
+.username-input:focus { border-color: var(--accent); }
+
+.settings-btn {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 9px 10px; border: none; border-radius: 8px;
+    background: transparent; color: var(--ink);
+    font-family: inherit; font-size: 13.5px; cursor: pointer;
+}
+
+.settings-btn:hover { background: var(--hover); }
+
+/* ---------- ASOSIY CHAT MAYDONI ---------- */
+.main { flex: 1; display: flex; flex-direction: column; background: var(--bg); min-width: 0; }
 
 .messages-box {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex: 1; overflow-y: auto; padding: 32px 24px 16px;
+    display: flex; flex-direction: column; gap: 18px;
+    max-width: 760px; width: 100%; margin: 0 auto;
 }
+
+.empty-state { margin: auto; text-align: center; color: var(--ink-soft); }
+.empty-state h2 { font-size: 22px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+.empty-state p { font-size: 14px; }
 
 .message {
-    background: #334155;
-    padding: 10px 15px;
-    border-radius: 8px;
-    max-width: 80%;
+    max-width: 78%; padding: 11px 16px; border-radius: 16px;
+    font-size: 15px; line-height: 1.5; background: var(--user-bubble);
+    align-self: flex-end; word-wrap: break-word;
 }
 
-.ai-message {
-    background: #0284c7;
-    border-left: 4px solid #38bdf8;
+.message strong {
+    display: block; font-size: 11px; font-weight: 600; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 3px;
 }
 
-.input-box {
-    padding: 15px;
-    background: #0f172a;
+.ai-message { background: transparent; align-self: flex-start; max-width: 88%; padding: 4px 0; }
+.ai-message strong { color: var(--accent); }
+
+/* ---------- YOZISH MAYDONI ---------- */
+.input-row { flex-shrink: 0; padding: 16px 24px 24px; }
+
+.input-shell {
+    max-width: 760px; margin: 0 auto; display: flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 26px;
+    padding: 6px 6px 6px 18px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+}
+
+.input-shell input {
+    flex: 1; border: none; outline: none; background: transparent;
+    font-family: inherit; font-size: 15px; color: var(--ink); padding: 10px 0;
+}
+
+.send-btn {
+    width: 38px; height: 38px; flex-shrink: 0; border: none; border-radius: 50%;
+    background: var(--accent); color: #fff; display: flex; align-items: center;
+    justify-content: center; cursor: pointer; transition: opacity 0.15s;
+}
+
+.send-btn:hover { opacity: 0.85; }
+
+/* ---------- SOZLAMALAR MODAL ---------- */
+.modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: none; align-items: center; justify-content: center; z-index: 50;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; width: 320px; padding: 20px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+}
+
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.modal-header h3 { font-size: 16px; font-weight: 600; }
+
+.modal-close {
+    border: none; background: transparent; font-size: 16px; cursor: pointer; color: var(--ink-soft);
+}
+
+.modal-row {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 14px; padding: 8px 0;
+}
+
+.theme-toggle {
+    border: 1px solid var(--border); background: var(--bg); color: var(--ink);
+    padding: 6px 14px; border-radius: 20px; font-family: inherit;
+    font-size: 13px; cursor: pointer;
+}
+
+.theme-toggle:hover { border-color: var(--accent); }
+
+/* ---------- TYPING ANIMATSIYASI ---------- */
+.typing-indicator {
     display: flex;
-    gap: 10px;
+    align-items: center;
+    gap: 8px;
 }
 
-input, button {
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid #334155;
-    background: #1e293b;
-    color: white;
+.typing-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
 }
 
-button {
-    background: #2563eb;
-    cursor: pointer;
-    font-weight: bold;
+.typing-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.4;
+    animation: typing-bounce 1.2s infinite ease-in-out;
 }
 
-button:hover { background: #1d4ed8; }
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 720px) {
+    .sidebar { display: none; }
+    .messages-box { padding: 20px 14px 12px; }
+    .input-row { padding: 12px 14px 20px; }
+    .message, .ai-message { max-width: 90%; }
+}

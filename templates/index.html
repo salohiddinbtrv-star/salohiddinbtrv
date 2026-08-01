@@ -1,49 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="uz">
 <head>
-    <title>Smart Finance App</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notfic</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-<div class="app">
+    <div class="app">
 
-    <div class="header">
-        <h1>💰 Smart Finance Dashboard</h1>
-        <p>Yoshlar uchun moliyaviy boshqaruv tizimi</p>
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <span class="dot"></span>
+                <span>Notfic</span>
+            </div>
+
+            <button class="new-chat-btn" onclick="newChat()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                Yangi suhbat
+            </button>
+
+            <nav class="sidebar-section">
+                <span class="sidebar-label">So'nggi suhbatlar</span>
+                <div id="chat-list" class="chat-list"></div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <input type="text" id="username" placeholder="Ismingiz" class="username-input">
+                <button class="settings-btn" onclick="openSettings()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 8a4 4 0 100 8 4 4 0 000-8z" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 13a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-1.8-.3 1.6 1.6 0 00-1 1.5V19a2 2 0 11-4 0v-.1a1.6 1.6 0 00-1-1.5 1.6 1.6 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00.3-1.8 1.6 1.6 0 00-1.5-1H4a2 2 0 110-4h.1a1.6 1.6 0 001.5-1 1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H10a1.6 1.6 0 001-1.5V4a2 2 0 114 0v.1a1.6 1.6 0 001 1.5 1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V10a1.6 1.6 0 001.5 1H20a2 2 0 110 4h-.1a1.6 1.6 0 00-1.5 1z" stroke="currentColor" stroke-width="1.6"/></svg>
+                    Sozlamalar
+                </button>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div id="messages-box" class="messages-box"></div>
+
+            <footer class="input-row">
+                <div class="input-shell">
+                    <input type="text" id="message-input" placeholder="Xabaringizni yozing..." onkeypress="if(event.key==='Enter') sendMessage()">
+                    <button onclick="sendMessage()" class="send-btn" aria-label="Yuborish">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 12L20 4L14 20L11 13L4 12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </footer>
+        </main>
+
     </div>
 
-    <div class="card">
-        <form action="/calculate" method="post">
-            <div class="grid">
-                <input type="number" name="income" placeholder="Oylik daromad (so'm)" required>
-                <input type="number" name="expenses" placeholder="Oylik xarajat (so'm)" required>
+    <div id="settings-modal" class="modal-overlay" onclick="if(event.target===this) closeSettings()">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Sozlamalar</h3>
+                <button class="modal-close" onclick="closeSettings()">X</button>
             </div>
-            <input type="number" name="savings_goal" placeholder="Tejash maqsadi (so'm)" required>
-            <button type="submit">Hisoblash</button>
-        </form>
-    </div>
-
-    {% if remaining %}
-    <div class="card">
-        <div class="result-box">
-            <div class="result-item">
-                <h3>Qolgan mablag'</h3>
-                <p>{{ remaining }} so'm</p>
-            </div>
-            <div class="result-item">
-                <h3>Har oy yig‘ish</h3>
-                <p>{{ monthly_needed }} so'm</p>
+            <div class="modal-row">
+                <span>Mavzu</span>
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="theme-label">Och rang</span>
+                </button>
             </div>
         </div>
-
-        <div class="advice">
-            {{ advice }}
-        </div>
     </div>
-    {% endif %}
 
-</div>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="/static/script.js"></script>
 
 </body>
 </html>
