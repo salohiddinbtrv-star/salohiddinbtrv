@@ -11,7 +11,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'notfic_secret_key_123'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Groq AI mijozini ishga tushirish
 ai_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
