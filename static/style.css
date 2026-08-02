@@ -225,4 +225,11 @@ html, body {
     .messages-box { padding: 20px 14px 12px; }
     .input-row { padding: 12px 14px 20px; }
     .message, .ai-message { max-width: 90%; }
+}.conn-banner {
+    text-align: center;
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: var(--sidebar-bg);
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
 }

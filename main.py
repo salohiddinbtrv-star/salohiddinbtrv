@@ -74,20 +74,18 @@ def handle_disconnect():
     logger.info("Foydalanuvchi uzildi.")
 
 
-# ---------- AI BILAN SHAXSIY SUHBAT ----------
-# Bu hech qachon boshqalarga translatsiya qilinmaydi — faqat yuborgan odamga qaytadi
 @socketio.on('ai_message')
 def handle_ai_message(data):
     username = (data.get('username') or 'Anonim').strip()[:50]
     msg = (data.get('message') or '').strip()[:2000]
+    client_id = data.get('clientId')
 
     if not msg:
         return
 
     logger.info(f"[AI-shaxsiy] {username}: {msg}")
 
-    # Faqat shu foydalanuvchining o'ziga (broadcast YO'Q)
-    emit('ai_response_message', {'username': username, 'message': msg, 'isAI': False})
+    emit('ai_response_message', {'username': username, 'message': msg, 'isAI': False, 'clientId': client_id})
 
     emit('ai_typing', {'typing': True})
     ai_reply = get_ai_response(msg)
@@ -95,23 +93,22 @@ def handle_ai_message(data):
     emit('ai_response_message', {'username': AI_NAME, 'message': ai_reply, 'isAI': True})
 
 
-# ---------- OCHIQ SUHBAT (ODAMLAR O'ZARO) ----------
-# Bu hammaga translatsiya qilinadi, AI ishtirok etmaydi
 @socketio.on('public_message')
 def handle_public_message(data):
     username = (data.get('username') or 'Anonim').strip()[:50]
     msg = (data.get('message') or '').strip()[:2000]
+    client_id = data.get('clientId')
 
     if not msg:
         return
 
     logger.info(f"[Ochiq] {username}: {msg}")
 
-    emit('public_response_message', {'username': username, 'message': msg}, broadcast=True)
+    emit('public_response_message', {'username': username, 'message': msg, 'clientId': client_id}, broadcast=True)
 
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     logger.info(f"Notfic server {port}-portda ishga tushmoqda...")
-    socketio.run(app, host='0.0.0.0', port=port, debug=debug_mode)
+    socketio.run(app, host='0.0.0.0', port=port, debug=debug_mode)s

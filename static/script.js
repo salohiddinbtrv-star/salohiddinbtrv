@@ -9,6 +9,9 @@ const THEME_KEY = 'notfic_theme';
 const PUBLIC_ID = 'public';
 const PUBLIC_STORAGE_KEY = 'notfic_public_history';
 
+let isConnected = false;
+const sentMessageIds = new Set();
+
 /* ---------- AI SUHBATLARINI SAQLASH (shaxsiy, faqat shu brauzerda) ---------- */
 function loadChats() {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -90,13 +93,12 @@ function renderChatList() {
     }
 }
 
-/* ---------- OCHIQ SUHBAT TARIXI (bu ham faqat local ko'rinish uchun, xabarlar serverdan real vaqtda keladi) ---------- */
+/* ---------- OCHIQ SUHBAT TARIXI ---------- */
 function loadPublicHistory() {
     return JSON.parse(localStorage.getItem(PUBLIC_STORAGE_KEY) || '[]');
 }
 
 function savePublicHistory(list) {
-    // faqat oxirgi 100 tasi saqlanadi, xotira toshib ketmasligi uchun
     localStorage.setItem(PUBLIC_STORAGE_KEY, JSON.stringify(list.slice(-100)));
 }
 
@@ -138,13 +140,54 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+function clearEmptyState() {
+    const empty = messagesBox.querySelector('.empty-state');
+    if (empty) messagesBox.innerHTML = '';
+}
+
+/* ---------- ULANISH HOLATI ---------- */
+socket.on('connect', function () {
+    isConnected = true;
+    hideConnectionBanner();
+});
+
+socket.on('disconnect', function () {
+    isConnected = false;
+    showConnectionBanner('Aloqa uzildi, qayta ulanmoqda...');
+});
+
+socket.on('connect_error', function () {
+    showConnectionBanner('Serverga ulanmoqda, iltimos kuting...');
+});
+
+function showConnectionBanner(text) {
+    let banner = document.getElementById('conn-banner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'conn-banner';
+        banner.className = 'conn-banner';
+        document.querySelector('.main').insertBefore(banner, messagesBox);
+    }
+    banner.textContent = text;
+}
+
+function hideConnectionBanner() {
+    const banner = document.getElementById('conn-banner');
+    if (banner) banner.remove();
+}
+
 /* ---------- SOCKET.IO: AI SUHBATI (shaxsiy) ---------- */
 socket.on('ai_response_message', function (data) {
+    // agar bu bizning xabarimizning aks-sadosi bo'lsa va allaqachon ko'rsatilgan bo'lsa, qayta qo'shmaymiz
+    if (data.clientId && sentMessageIds.has(data.clientId)) {
+        sentMessageIds.delete(data.clientId);
+        return;
+    }
+
     const chats = loadChats();
     let activeId = getActiveChatId();
 
     if (isPublicActive() || !chats[activeId]) {
-        // agar hozircha faol AI suhbat bo'lmasa, yangisini yaratamiz
         activeId = 'chat_' + Date.now();
         chats[activeId] = { id: activeId, title: 'Yangi AI suhbat', messages: [] };
         setActiveChatId(activeId);
@@ -152,11 +195,6 @@ socket.on('ai_response_message', function (data) {
 
     const chat = chats[activeId];
     chat.messages.push(data);
-
-    if (chat.title === 'Yangi AI suhbat' && !data.isAI) {
-        chat.title = data.message.slice(0, 28) + (data.message.length > 28 ? '...' : '');
-    }
-
     saveChats(chats);
     renderChatList();
     if (!isPublicActive()) renderMessages();
@@ -173,6 +211,7 @@ socket.on('ai_typing', function (data) {
 
 function showTypingIndicator() {
     hideTypingIndicator();
+    clearEmptyState();
     const el = document.createElement('div');
     el.className = 'message ai-message typing-indicator';
     el.id = 'typing-indicator';
@@ -188,16 +227,23 @@ function hideTypingIndicator() {
 
 /* ---------- SOCKET.IO: OCHIQ SUHBAT (hammaga) ---------- */
 socket.on('public_response_message', function (data) {
+    if (data.clientId && sentMessageIds.has(data.clientId)) {
+        sentMessageIds.delete(data.clientId);
+        return;
+    }
+
     const history = loadPublicHistory();
     history.push(data);
     savePublicHistory(history);
 
     if (isPublicActive()) {
-        renderMessages();
+        clearEmptyState();
+        appendMessageToDOM(data);
+        messagesBox.scrollTop = messagesBox.scrollHeight;
     }
 });
 
-/* ---------- XABAR YUBORISH ---------- */
+/* ---------- XABAR YUBORISH (darhol ekranga chiqadi) ---------- */
 function sendMessage() {
     const usernameInput = document.getElementById('username');
     const messageInput = document.getElementById('message-input');
@@ -207,10 +253,39 @@ function sendMessage() {
 
     if (message === '') return;
 
+    const clientId = 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    sentMessageIds.add(clientId);
+
+    const localData = { username: username, message: message, isAI: false, clientId: clientId };
+
+    // darhol ekranga chiqaramiz — internet sekin bo'lsa ham xabar "yo'qolib qolmaydi"
+    clearEmptyState();
+    appendMessageToDOM(localData);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+
     if (isPublicActive()) {
-        socket.emit('public_message', { username: username, message: message });
+        const history = loadPublicHistory();
+        history.push(localData);
+        savePublicHistory(history);
+        socket.emit('public_message', { username: username, message: message, clientId: clientId });
     } else {
-        socket.emit('ai_message', { username: username, message: message });
+        const chats = loadChats();
+        let activeId = getActiveChatId();
+        if (!chats[activeId]) {
+            activeId = 'chat_' + Date.now();
+            chats[activeId] = { id: activeId, title: 'Yangi AI suhbat', messages: [] };
+            setActiveChatId(activeId);
+        }
+        const chat = chats[activeId];
+        chat.messages.push(localData);
+        if (chat.title === 'Yangi AI suhbat') {
+            chat.title = message.slice(0, 28) + (message.length > 28 ? '...' : '');
+        }
+        saveChats(chats);
+        renderChatList();
+        updateHeader();
+
+        socket.emit('ai_message', { username: username, message: message, clientId: clientId });
     }
 
     messageInput.value = '';
