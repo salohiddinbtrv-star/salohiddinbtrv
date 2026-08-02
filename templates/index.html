@@ -18,13 +18,17 @@
                 <span>Notfic</span>
             </div>
 
-            <button class="new-chat-btn" onclick="newChat()">
+            <div id="public-chat-item" class="chat-item pinned" onclick="switchToPublic()">
+                💬 Ochiq Suhbat
+            </div>
+
+            <button class="new-chat-btn" onclick="newAIChat()">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Yangi suhbat
+                Yangi AI suhbat
             </button>
 
             <nav class="sidebar-section">
-                <span class="sidebar-label">So'nggi suhbatlar</span>
+                <span class="sidebar-label">🤖 AI bilan suhbatlarim</span>
                 <div id="chat-list" class="chat-list"></div>
             </nav>
 
@@ -38,6 +42,10 @@
         </aside>
 
         <main class="main">
+            <div class="chat-header">
+                <span id="chat-header-title">💬 Ochiq Suhbat</span>
+            </div>
+
             <div id="messages-box" class="messages-box"></div>
 
             <footer class="input-row">
