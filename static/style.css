@@ -86,6 +86,17 @@ html, body {
 .sidebar-link:hover, .chat-item:hover { background: var(--hover); }
 .chat-item.active { background: var(--panel); font-weight: 500; }
 
+.chat-item.pinned {
+    margin-bottom: 14px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+}
+
+.chat-item.pinned.active {
+    background: var(--panel);
+    border-color: var(--accent);
+}
+
 .sidebar-footer { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 
 .username-input {
@@ -107,6 +118,28 @@ html, body {
 
 /* ---------- ASOSIY CHAT MAYDONI ---------- */
 .main { flex: 1; display: flex; flex-direction: column; background: var(--bg); min-width: 0; }
+
+.chat-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink-soft);
+}
+
+.hamburger-btn {
+    display: none;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    padding: 4px;
+    align-items: center;
+    justify-content: center;
+}
 
 .messages-box {
     flex: 1; overflow-y: auto; padding: 32px 24px 16px;
@@ -190,24 +223,12 @@ html, body {
 .theme-toggle:hover { border-color: var(--accent); }
 
 /* ---------- TYPING ANIMATSIYASI ---------- */
-.typing-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.typing-dots {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-}
+.typing-indicator { display: flex; align-items: center; gap: 8px; }
+.typing-dots { display: inline-flex; align-items: center; gap: 3px; }
 
 .typing-dots span {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    opacity: 0.4;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); opacity: 0.4;
     animation: typing-bounce 1.2s infinite ease-in-out;
 }
 
@@ -219,17 +240,47 @@ html, body {
     30% { transform: translateY(-4px); opacity: 1; }
 }
 
-/* ---------- RESPONSIVE ---------- */
-@media (max-width: 720px) {
-    .sidebar { display: none; }
-    .messages-box { padding: 20px 14px 12px; }
-    .input-row { padding: 12px 14px 20px; }
-    .message, .ai-message { max-width: 90%; }
-}.conn-banner {
+/* ---------- ULANISH BANNERI ---------- */
+.conn-banner {
     text-align: center;
     font-size: 13px;
     color: var(--ink-soft);
     background: var(--sidebar-bg);
     padding: 8px;
     border-bottom: 1px solid var(--border);
+}
+
+/* ---------- SIDEBAR OVERLAY (MOBIL) ---------- */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 40;
+}
+
+.sidebar-overlay.open { display: block; }
+
+/* ---------- RESPONSIVE (TELEFON) ---------- */
+@media (max-width: 720px) {
+    .hamburger-btn { display: flex; }
+
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 50;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        box-shadow: 8px 0 24px rgba(0,0,0,0.15);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .messages-box { padding: 20px 14px 12px; }
+    .input-row { padding: 12px 14px 20px; }
+    .message, .ai-message { max-width: 90%; }
 }

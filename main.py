@@ -7,6 +7,7 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
 from groq import Groq
+
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -22,7 +23,7 @@ if not GROQ_API_KEY:
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 ai_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 

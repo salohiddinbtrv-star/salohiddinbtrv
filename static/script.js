@@ -12,6 +12,17 @@ const PUBLIC_STORAGE_KEY = 'notfic_public_history';
 let isConnected = false;
 const sentMessageIds = new Set();
 
+/* ---------- HAMBURGER / MOBIL MENYU ---------- */
+function openSidebar() {
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('sidebar-overlay').classList.add('open');
+}
+
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
 /* ---------- AI SUHBATLARINI SAQLASH (shaxsiy, faqat shu brauzerda) ---------- */
 function loadChats() {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -42,6 +53,7 @@ function newAIChat() {
     renderChatList();
     renderMessages();
     updateHeader();
+    closeSidebar();
 }
 
 function switchToPublic() {
@@ -49,6 +61,7 @@ function switchToPublic() {
     renderChatList();
     renderMessages();
     updateHeader();
+    closeSidebar();
 }
 
 function updateHeader() {
@@ -87,6 +100,7 @@ function renderChatList() {
                 renderChatList();
                 renderMessages();
                 updateHeader();
+                closeSidebar();
             };
         })(id);
         chatList.appendChild(item);
@@ -178,7 +192,6 @@ function hideConnectionBanner() {
 
 /* ---------- SOCKET.IO: AI SUHBATI (shaxsiy) ---------- */
 socket.on('ai_response_message', function (data) {
-    // agar bu bizning xabarimizning aks-sadosi bo'lsa va allaqachon ko'rsatilgan bo'lsa, qayta qo'shmaymiz
     if (data.clientId && sentMessageIds.has(data.clientId)) {
         sentMessageIds.delete(data.clientId);
         return;
@@ -258,7 +271,6 @@ function sendMessage() {
 
     const localData = { username: username, message: message, isAI: false, clientId: clientId };
 
-    // darhol ekranga chiqaramiz — internet sekin bo'lsa ham xabar "yo'qolib qolmaydi"
     clearEmptyState();
     appendMessageToDOM(localData);
     messagesBox.scrollTop = messagesBox.scrollHeight;
