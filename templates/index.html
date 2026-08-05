@@ -12,7 +12,9 @@
 
     <div class="app">
 
-        <aside class="sidebar">
+        <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-brand">
                 <span class="dot"></span>
                 <span>Notfic</span>
@@ -43,6 +45,9 @@
 
         <main class="main">
             <div class="chat-header">
+                <button class="hamburger-btn" onclick="openSidebar()" aria-label="Menyu">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
                 <span id="chat-header-title">💬 Ochiq Suhbat</span>
             </div>
 
