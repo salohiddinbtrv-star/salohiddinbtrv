@@ -1,10 +1,12 @@
+import eventlet
+eventlet.monkey_patch()
+
 import os
 import logging
 from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
 from groq import Groq
-
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
