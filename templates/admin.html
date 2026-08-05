@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel — Notfic</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+
+    <div class="admin-app">
+
+        <header class="admin-header">
+            <div class="admin-brand">
+                <span class="dot"></span>
+                <span>Notfic Admin Panel</span>
+            </div>
+            <a href="{{ url_for('admin_logout') }}" class="logout-btn">Chiqish</a>
+        </header>
+
+        <main class="admin-main">
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">🟢 Hozir onlayn</span>
+                    <span class="stat-value" id="stat-online">{{ online_count }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">💬 Ochiq suhbat xabarlari</span>
+                    <span class="stat-value" id="stat-public">{{ total_public }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">🤖 AI suhbatlari</span>
+                    <span class="stat-value" id="stat-ai">{{ total_ai }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">🔌 Jami ulanishlar</span>
+                    <span class="stat-value" id="stat-connections">{{ total_connections }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">⏱ Server ishlab turgan vaqt</span>
+                    <span class="stat-value stat-value-sm" id="stat-uptime">{{ uptime }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">⚡ AI holati</span>
+                    <span class="stat-value stat-value-sm">
+                        {% if ai_connected %}
+                            <span class="status-ok">Ulangan</span>
+                        {% else %}
+                            <span class="status-error">Ulanmagan</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <section class="history-section">
+                <h2>So'nggi Ochiq Suhbat xabarlari</h2>
+                <div class="history-list" id="history-list">
+                    {% for h in history %}
+                    <div class="history-item">
+                        <span class="history-time">{{ h.time }}</span>
+                        <strong>{{ h.username }}:</strong> {{ h.message }}
+                    </div>
+                    {% else %}
+                    <div class="history-empty">Hali xabar yo'q</div>
+                    {% endfor %}
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        async function refreshStats() {
+            try {
+                const res = await fetch('/admin/api/stats');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                document.getElementById('stat-online').textContent = data.online_count;
+                document.getElementById('stat-public').textContent = data.total_public;
+                document.getElementById('stat-ai').textContent = data.total_ai;
+                document.getElementById('stat-connections').textContent = data.total_connections;
+                document.getElementById('stat-uptime').textContent = data.uptime;
+
+                const list = document.getElementById('history-list');
+                if (data.history.length === 0) {
+                    list.innerHTML = '<div class="history-empty">Hali xabar yoq</div>';
+                } else {
+                    list.innerHTML = data.history.map(function(h) {
+                        return '<div class="history-item"><span class="history-time">' + h.time + '</span><strong>' + h.username + ':</strong> ' + h.message + '</div>';
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Statistikani yangilashda xato:', e);
+            }
+        }
+
+        setInterval(refreshStats, 5000);
+    </script>
+
+</body>
+</html>

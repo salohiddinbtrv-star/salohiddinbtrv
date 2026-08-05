@@ -3,7 +3,11 @@ eventlet.monkey_patch()
 
 import os
 import logging
-from flask import Flask, render_template
+from datetime import datetime
+from functools import wraps
+from collections import deque
+
+from flask import Flask, render_template, session, request, redirect, url_for, jsonify
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
 from groq import Groq
@@ -16,6 +20,7 @@ logger = logging.getLogger("notfic")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SECRET_KEY = os.getenv("SECRET_KEY", "notfic_secret_key_123")
 AI_MODEL = os.getenv("AI_MODEL", "llama-3.3-70b-versatile")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "notfic_admin_2026")
 AI_NAME = "Notfic AI ⚡"
 
 if not GROQ_API_KEY:
@@ -31,6 +36,16 @@ SYSTEM_PROMPT = (
     "Sening isming Notfic AI. Sen Notfic platformasining aqlli yordamchisisan. "
     "Do'stona, qisqa, tushunarli va aqlli javob ber."
 )
+
+# ---------- XOTIRADA SAQLANADIGAN STATISTIKA ----------
+SERVER_START_TIME = datetime.utcnow()
+connected_sids = set()
+stats = {
+    "total_public_messages": 0,
+    "total_ai_messages": 0,
+    "total_connections": 0,
+}
+public_history = deque(maxlen=50)
 
 
 def get_ai_response(prompt: str) -> str:
@@ -57,6 +72,17 @@ def get_ai_response(prompt: str) -> str:
         return f"🤖 [{AI_NAME}]: Hozir javob bera olmadim, birozdan so'ng qayta urinib ko'ring."
 
 
+# ---------- ADMIN HIMOYASI ----------
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('is_admin'):
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ---------- ODDIY ROUTE'LAR ----------
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -67,14 +93,74 @@ def health():
     return {"status": "ok", "ai_connected": ai_client is not None}, 200
 
 
+# ---------- ADMIN ROUTE'LARI ----------
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    error = None
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        if password == ADMIN_PASSWORD:
+            session['is_admin'] = True
+            return redirect(url_for('admin_dashboard'))
+        else:
+            error = "Parol notogri"
+    return render_template('admin_login.html', error=error)
+
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('is_admin', None)
+    return redirect(url_for('admin_login'))
+
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    uptime_seconds = int((datetime.utcnow() - SERVER_START_TIME).total_seconds())
+    hours = uptime_seconds // 3600
+    minutes = (uptime_seconds % 3600) // 60
+
+    return render_template(
+        'admin.html',
+        online_count=len(connected_sids),
+        total_public=stats["total_public_messages"],
+        total_ai=stats["total_ai_messages"],
+        total_connections=stats["total_connections"],
+        uptime=f"{hours} soat {minutes} daqiqa",
+        ai_connected=ai_client is not None,
+        history=list(public_history)[::-1]
+    )
+
+
+@app.route('/admin/api/stats')
+@admin_required
+def admin_api_stats():
+    uptime_seconds = int((datetime.utcnow() - SERVER_START_TIME).total_seconds())
+    hours = uptime_seconds // 3600
+    minutes = (uptime_seconds % 3600) // 60
+
+    return jsonify({
+        "online_count": len(connected_sids),
+        "total_public": stats["total_public_messages"],
+        "total_ai": stats["total_ai_messages"],
+        "total_connections": stats["total_connections"],
+        "uptime": f"{hours} soat {minutes} daqiqa",
+        "history": list(public_history)[::-1]
+    })
+
+
+# ---------- SOCKET.IO ----------
 @socketio.on('connect')
 def handle_connect():
-    logger.info("Yangi foydalanuvchi ulandi.")
+    connected_sids.add(request.sid)
+    stats["total_connections"] += 1
+    logger.info(f"Yangi foydalanuvchi ulandi. Hozir onlayn: {len(connected_sids)}")
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    logger.info("Foydalanuvchi uzildi.")
+    connected_sids.discard(request.sid)
+    logger.info(f"Foydalanuvchi uzildi. Hozir onlayn: {len(connected_sids)}")
 
 
 @socketio.on('ai_message')
@@ -86,6 +172,7 @@ def handle_ai_message(data):
     if not msg:
         return
 
+    stats["total_ai_messages"] += 1
     logger.info(f"[AI-shaxsiy] {username}: {msg}")
 
     emit('ai_response_message', {'username': username, 'message': msg, 'isAI': False, 'clientId': client_id})
@@ -104,6 +191,13 @@ def handle_public_message(data):
 
     if not msg:
         return
+
+    stats["total_public_messages"] += 1
+    public_history.append({
+        "username": username,
+        "message": msg,
+        "time": datetime.utcnow().strftime("%H:%M:%S")
+    })
 
     logger.info(f"[Ochiq] {username}: {msg}")
 

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Notfic</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+    <div class="login-wrap">
+        <div class="login-card">
+            <div class="login-brand">
+                <span class="dot"></span>
+                <span>Notfic Admin</span>
+            </div>
+
+            {% if error %}
+            <div class="login-error">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST">
+                <label for="password">Parol</label>
+                <input type="password" id="password" name="password" placeholder="Admin parolini kiriting" autofocus required>
+                <button type="submit">Kirish</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
