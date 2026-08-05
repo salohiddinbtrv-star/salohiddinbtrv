@@ -1,7 +1,13 @@
-import eventlet
-eventlet.monkey_patch()
-
 import os
+
+# Faqat Render (production) muhitida eventlet ishlatiladi.
+# Local Windows'da greenlet DLL muammosi boligi uchun, uni majburiy qilmaymiz.
+IS_RENDER = os.environ.get("RENDER") is not None
+
+if IS_RENDER:
+    import eventlet
+    eventlet.monkey_patch()
+
 import logging
 from datetime import datetime
 from functools import wraps
@@ -28,7 +34,9 @@ if not GROQ_API_KEY:
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
+async_mode = 'eventlet' if IS_RENDER else 'threading'
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
 
 ai_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
@@ -37,7 +45,6 @@ SYSTEM_PROMPT = (
     "Do'stona, qisqa, tushunarli va aqlli javob ber."
 )
 
-# ---------- XOTIRADA SAQLANADIGAN STATISTIKA ----------
 SERVER_START_TIME = datetime.utcnow()
 connected_sids = set()
 stats = {
@@ -72,7 +79,6 @@ def get_ai_response(prompt: str) -> str:
         return f"🤖 [{AI_NAME}]: Hozir javob bera olmadim, birozdan so'ng qayta urinib ko'ring."
 
 
-# ---------- ADMIN HIMOYASI ----------
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -82,7 +88,6 @@ def admin_required(f):
     return decorated
 
 
-# ---------- ODDIY ROUTE'LAR ----------
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -93,7 +98,6 @@ def health():
     return {"status": "ok", "ai_connected": ai_client is not None}, 200
 
 
-# ---------- ADMIN ROUTE'LARI ----------
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     error = None
@@ -149,7 +153,6 @@ def admin_api_stats():
     })
 
 
-# ---------- SOCKET.IO ----------
 @socketio.on('connect')
 def handle_connect():
     connected_sids.add(request.sid)
