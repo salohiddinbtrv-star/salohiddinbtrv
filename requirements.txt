@@ -7,3 +7,4 @@ groq
 Flask-SQLAlchemy==3.1.1
 psycopg2-binary==2.9.9
 Authlib==1.3.2
+requests
