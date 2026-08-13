@@ -2,12 +2,16 @@ const socket = io();
 const messagesBox = document.getElementById('messages-box');
 const chatList = document.getElementById('chat-list');
 const chatHeaderTitle = document.getElementById('chat-header-title');
+const anonLimitBadge = document.getElementById('anon-limit-badge');
 
 const STORAGE_KEY = 'notfic_ai_chats';
 const ACTIVE_KEY = 'notfic_active_chat';
 const THEME_KEY = 'notfic_theme';
 const PUBLIC_ID = 'public';
 const PUBLIC_STORAGE_KEY = 'notfic_public_history';
+
+const IS_LOGGED_IN = document.body.getAttribute('data-logged-in') === 'true';
+const ANON_LIMIT = parseInt(document.body.getAttribute('data-anon-limit') || '10', 10);
 
 let isConnected = false;
 const sentMessageIds = new Set();
@@ -23,7 +27,7 @@ function closeSidebar() {
     document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
-/* ---------- AI SUHBATLARINI SAQLASH (shaxsiy, faqat shu brauzerda) ---------- */
+/* ---------- AI SUHBATLARINI SAQLASH ---------- */
 function loadChats() {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
 }
@@ -190,6 +194,28 @@ function hideConnectionBanner() {
     if (banner) banner.remove();
 }
 
+/* ---------- ANONIM XABAR CHEGARASI ---------- */
+socket.on('anon_limit_update', function (data) {
+    if (IS_LOGGED_IN) return;
+    anonLimitBadge.style.display = 'inline-block';
+    anonLimitBadge.textContent = data.remaining + ' ta bepul xabar qoldi';
+    if (data.remaining <= 3) {
+        anonLimitBadge.classList.add('anon-limit-warning');
+    }
+});
+
+socket.on('login_required', function (data) {
+    openLoginRequired();
+});
+
+function openLoginRequired() {
+    document.getElementById('login-required-modal').classList.add('open');
+}
+
+function closeLoginRequired() {
+    document.getElementById('login-required-modal').classList.remove('open');
+}
+
 /* ---------- SOCKET.IO: AI SUHBATI (shaxsiy) ---------- */
 socket.on('ai_response_message', function (data) {
     if (data.clientId && sentMessageIds.has(data.clientId)) {
@@ -238,7 +264,7 @@ function hideTypingIndicator() {
     if (el) el.remove();
 }
 
-/* ---------- SOCKET.IO: OCHIQ SUHBAT (hammaga) ---------- */
+/* ---------- SOCKET.IO: OCHIQ SUHBAT ---------- */
 socket.on('public_response_message', function (data) {
     if (data.clientId && sentMessageIds.has(data.clientId)) {
         sentMessageIds.delete(data.clientId);
@@ -256,12 +282,15 @@ socket.on('public_response_message', function (data) {
     }
 });
 
-/* ---------- XABAR YUBORISH (darhol ekranga chiqadi) ---------- */
+/* ---------- XABAR YUBORISH ---------- */
 function sendMessage() {
     const usernameInput = document.getElementById('username');
     const messageInput = document.getElementById('message-input');
 
-    const username = usernameInput.value.trim() || 'Anonim';
+    const username = IS_LOGGED_IN
+        ? (document.querySelector('.profile-name') ? document.querySelector('.profile-name').textContent.trim() : 'Foydalanuvchi')
+        : (usernameInput.value.trim() || 'Anonim');
+
     const message = messageInput.value.trim();
 
     if (message === '') return;
@@ -324,6 +353,113 @@ function closeSettings() {
     document.getElementById('settings-modal').classList.remove('open');
 }
 
+/* ---------- PROFIL MODAL ---------- */
+function openProfile() {
+    const modal = document.getElementById('profile-modal');
+    if (modal) modal.classList.add('open');
+}
+
+function closeProfile() {
+    const modal = document.getElementById('profile-modal');
+    if (modal) modal.classList.remove('open');
+}
+
+async function saveProfile() {
+    const nameInput = document.getElementById('profile-name-input');
+    const bioInput = document.getElementById('profile-bio-input');
+    const statusEl = document.getElementById('profile-save-status');
+
+    statusEl.textContent = 'Saqlanmoqda...';
+
+    try {
+        const res = await fetch('/api/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: nameInput.value, bio: bioInput.value })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            statusEl.textContent = 'Saqlandi ✓';
+            const nameEl = document.querySelector('.profile-name');
+            if (nameEl) nameEl.textContent = data.name;
+            setTimeout(function () { statusEl.textContent = ''; }, 2000);
+        } else {
+            statusEl.textContent = 'Xato yuz berdi';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Xato yuz berdi';
+    }
+}
+
+/* ---------- AVATAR YUKLASH ---------- */
+async function uploadAvatar(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const statusEl = document.getElementById('avatar-upload-status');
+    statusEl.textContent = 'Yuklanmoqda...';
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+        const res = await fetch('/api/profile/avatar', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            updateAvatarImages(data.avatar);
+            statusEl.textContent = 'Rasm yangilandi ✓';
+            setTimeout(function () { statusEl.textContent = ''; }, 2000);
+        } else {
+            statusEl.textContent = data.message || 'Xato yuz berdi';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Xato yuz berdi';
+    }
+
+    input.value = '';
+}
+
+async function removeAvatar() {
+    const statusEl = document.getElementById('avatar-upload-status');
+    statusEl.textContent = 'Ozgartirilmoqda...';
+
+    try {
+        const res = await fetch('/api/profile/avatar', { method: 'DELETE' });
+        const data = await res.json();
+
+        if (data.success) {
+            updateAvatarImages(data.avatar);
+            statusEl.textContent = 'Odatiy rasmga qaytarildi ✓';
+            setTimeout(function () { statusEl.textContent = ''; }, 2000);
+        }
+    } catch (e) {
+        statusEl.textContent = 'Xato yuz berdi';
+    }
+}
+
+function updateAvatarImages(url) {
+    const sidebarImg = document.getElementById('sidebar-avatar-img');
+    const profileImg = document.getElementById('profile-avatar-img');
+
+    [sidebarImg, profileImg].forEach(function (el) {
+        if (!el) return;
+        if (el.tagName === 'IMG') {
+            el.src = url;
+        } else {
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = el.className.replace('profile-avatar-fallback', '').trim();
+            img.id = el.id;
+            el.replaceWith(img);
+        }
+    });
+}
+
 /* ---------- BOSHLANG'ICH YUKLASH ---------- */
 window.addEventListener('DOMContentLoaded', function() {
     applyTheme(localStorage.getItem(THEME_KEY) || 'light');
@@ -336,10 +472,12 @@ window.addEventListener('DOMContentLoaded', function() {
     renderMessages();
     updateHeader();
 
-    const savedUsername = localStorage.getItem('notfic_username');
-    if (savedUsername) document.getElementById('username').value = savedUsername;
+    if (!IS_LOGGED_IN) {
+        const savedUsername = localStorage.getItem('notfic_username');
+        if (savedUsername) document.getElementById('username').value = savedUsername;
 
-    document.getElementById('username').addEventListener('change', function(e) {
-        localStorage.setItem('notfic_username', e.target.value);
-    });
+        document.getElementById('username').addEventListener('change', function (e) {
+            localStorage.setItem('notfic_username', e.target.value);
+        });
+    }
 });
