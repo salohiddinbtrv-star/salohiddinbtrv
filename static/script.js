@@ -16,6 +16,13 @@ const ANON_LIMIT = parseInt(document.body.getAttribute('data-anon-limit') || '10
 let isConnected = false;
 const sentMessageIds = new Set();
 
+/* ---------- MOBIL BALANDLIK TUZATISH (klaviatura muammosi) ---------- */
+function setViewportHeight() {
+    document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
+}
+setViewportHeight();
+window.addEventListener('resize', setViewportHeight);
+
 /* ---------- HAMBURGER / MOBIL MENYU ---------- */
 function openSidebar() {
     document.getElementById('sidebar').classList.add('open');

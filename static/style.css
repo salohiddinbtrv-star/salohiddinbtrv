@@ -7,32 +7,45 @@ html[data-theme="light"] {
     --ink-soft: #83807A;
     --border: #E8E5DE;
     --accent: #C15F3C;
+    --accent-soft: #F3E5DD;
     --user-bubble: #F0EEE6;
     --hover: rgba(31,30,29,0.05);
+    --shadow-sm: 0 1px 2px rgba(31,30,29,0.05);
+    --shadow-md: 0 8px 24px rgba(31,30,29,0.08);
+    --shadow-lg: 0 20px 50px rgba(31,30,29,0.16);
 }
 
 html[data-theme="dark"] {
-    --bg: #1A1918;
-    --sidebar-bg: #211F1D;
+    --bg: #171615;
+    --sidebar-bg: #1E1D1B;
     --panel: #262422;
     --ink: #F2F0EC;
     --ink-soft: #94908A;
     --border: #38352F;
     --accent: #E07A54;
+    --accent-soft: #3A2A22;
     --user-bubble: #322E2A;
     --hover: rgba(255,255,255,0.06);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-md: 0 8px 24px rgba(0,0,0,0.3);
+    --shadow-lg: 0 20px 50px rgba(0,0,0,0.4);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
     height: 100%;
-    font-family: 'Inter', -apple-system, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     color: var(--ink);
     background: var(--bg);
+    -webkit-tap-highlight-color: transparent;
 }
 
-.app { height: 100vh; display: flex; }
+.app {
+    height: 100vh;
+    height: calc(var(--vh, 1vh) * 100);
+    display: flex;
+}
 
 /* ---------- CHAP YON PANEL ---------- */
 .sidebar {
@@ -51,7 +64,11 @@ html, body {
     padding: 6px 8px 20px;
 }
 
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
 
 .new-chat-btn {
     display: flex; align-items: center; gap: 8px;
@@ -60,9 +77,11 @@ html, body {
     background: var(--panel); color: var(--ink);
     font-family: inherit; font-size: 13.5px; font-weight: 500;
     cursor: pointer; margin-bottom: 18px;
+    transition: background 0.15s, border-color 0.15s;
 }
 
-.new-chat-btn:hover { background: var(--hover); }
+.new-chat-btn:hover { background: var(--hover); border-color: var(--accent); }
+.new-chat-btn:active { transform: scale(0.98); }
 
 .sidebar-section { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 
@@ -81,10 +100,11 @@ html, body {
     color: var(--ink); text-decoration: none; font-size: 13.5px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     cursor: pointer;
+    transition: background 0.15s;
 }
 
 .sidebar-link:hover, .chat-item:hover { background: var(--hover); }
-.chat-item.active { background: var(--panel); font-weight: 500; }
+.chat-item.active { background: var(--panel); font-weight: 500; box-shadow: var(--shadow-sm); }
 
 .chat-item.pinned {
     margin-bottom: 14px;
@@ -103,6 +123,7 @@ html, body {
     width: 100%; font-family: inherit; font-size: 13px;
     padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
     background: var(--panel); color: var(--ink); outline: none;
+    transition: border-color 0.15s;
 }
 
 .username-input:focus { border-color: var(--accent); }
@@ -112,6 +133,7 @@ html, body {
     width: 100%; padding: 9px 10px; border: none; border-radius: 8px;
     background: transparent; color: var(--ink);
     font-family: inherit; font-size: 13.5px; cursor: pointer;
+    transition: background 0.15s;
 }
 
 .settings-btn:hover { background: var(--hover); }
@@ -128,6 +150,8 @@ html, body {
     font-weight: 600;
     font-size: 14px;
     color: var(--ink-soft);
+    flex-shrink: 0;
+    background: var(--bg);
 }
 
 .hamburger-btn {
@@ -136,25 +160,31 @@ html, body {
     background: transparent;
     color: var(--ink);
     cursor: pointer;
-    padding: 4px;
+    padding: 6px;
+    margin: -6px;
     align-items: center;
     justify-content: center;
+    border-radius: 8px;
 }
 
+.hamburger-btn:active { background: var(--hover); }
+
 .messages-box {
-    flex: 1; overflow-y: auto; padding: 32px 24px 16px;
-    display: flex; flex-direction: column; gap: 18px;
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 28px 24px 16px;
+    display: flex; flex-direction: column; gap: 14px;
     max-width: 760px; width: 100%; margin: 0 auto;
 }
 
-.empty-state { margin: auto; text-align: center; color: var(--ink-soft); }
+.empty-state { margin: auto; text-align: center; color: var(--ink-soft); padding: 0 20px; }
 .empty-state h2 { font-size: 22px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
-.empty-state p { font-size: 14px; }
+.empty-state p { font-size: 14px; line-height: 1.5; }
 
 .message {
-    max-width: 78%; padding: 11px 16px; border-radius: 16px;
+    max-width: 78%; padding: 10px 15px; border-radius: 18px;
     font-size: 15px; line-height: 1.5; background: var(--user-bubble);
     align-self: flex-end; word-wrap: break-word;
+    box-shadow: var(--shadow-sm);
 }
 
 .message strong {
@@ -162,59 +192,87 @@ html, body {
     text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 3px;
 }
 
-.ai-message { background: transparent; align-self: flex-start; max-width: 88%; padding: 4px 0; }
+.ai-message { background: transparent; align-self: flex-start; max-width: 88%; padding: 4px 0; box-shadow: none; }
 .ai-message strong { color: var(--accent); }
 
 /* ---------- YOZISH MAYDONI ---------- */
-.input-row { flex-shrink: 0; padding: 16px 24px 24px; }
+.input-row {
+    flex-shrink: 0;
+    padding: 12px 24px calc(16px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg);
+}
 
 .input-shell {
-    max-width: 760px; margin: 0 auto; display: flex; align-items: center; gap: 8px;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 26px;
-    padding: 6px 6px 6px 18px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    max-width: 760px; margin: 0 auto; display: flex; align-items: flex-end; gap: 6px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 22px;
+    padding: 5px 5px 5px 16px;
+    box-shadow: var(--shadow-md);
+    transition: border-color 0.15s;
 }
+
+.input-shell:focus-within { border-color: var(--accent); }
 
 .input-shell input {
     flex: 1; border: none; outline: none; background: transparent;
-    font-family: inherit; font-size: 15px; color: var(--ink); padding: 10px 0;
+    font-family: inherit; font-size: 15px; color: var(--ink);
+    padding: 9px 0;
+    min-width: 0;
 }
 
 .send-btn {
-    width: 38px; height: 38px; flex-shrink: 0; border: none; border-radius: 50%;
+    width: 36px; height: 36px; flex-shrink: 0; border: none; border-radius: 50%;
     background: var(--accent); color: #fff; display: flex; align-items: center;
-    justify-content: center; cursor: pointer; transition: opacity 0.15s;
+    justify-content: center; cursor: pointer; transition: opacity 0.15s, transform 0.1s;
 }
 
-.send-btn:hover { opacity: 0.85; }
+.send-btn:hover { opacity: 0.88; }
+.send-btn:active { transform: scale(0.92); }
 
 /* ---------- SOZLAMALAR MODAL ---------- */
 .modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    position: fixed; inset: 0; background: rgba(20,19,18,0.45);
     display: none; align-items: center; justify-content: center; z-index: 50;
+    padding: 16px;
+    backdrop-filter: blur(2px);
 }
 
-.modal-overlay.open { display: flex; }
+.modal-overlay.open { display: flex; animation: fade-in 0.15s ease; }
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
 
 .modal {
     background: var(--panel); border: 1px solid var(--border);
-    border-radius: 16px; width: 320px; padding: 20px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+    border-radius: 18px; width: 320px; max-width: 100%; padding: 20px;
+    box-shadow: var(--shadow-lg);
     max-height: 85vh;
     overflow-y: auto;
+    animation: modal-pop 0.18s ease;
+}
+
+@keyframes modal-pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .modal-header h3 { font-size: 16px; font-weight: 600; }
 
 .modal-close {
-    border: none; background: transparent; font-size: 16px; cursor: pointer; color: var(--ink-soft);
+    border: none; background: var(--hover); font-size: 14px; cursor: pointer; color: var(--ink-soft);
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
 }
 
 .modal-row {
     display: flex; align-items: center; justify-content: space-between;
-    font-size: 14px; padding: 8px 0;
+    font-size: 14px; padding: 10px 0;
+    border-bottom: 1px solid var(--border);
 }
+
+.modal-row:last-child { border-bottom: none; }
 
 .theme-toggle {
     border: 1px solid var(--border); background: var(--bg); color: var(--ink);
@@ -245,11 +303,12 @@ html, body {
 /* ---------- ULANISH BANNERI ---------- */
 .conn-banner {
     text-align: center;
-    font-size: 13px;
+    font-size: 12.5px;
     color: var(--ink-soft);
     background: var(--sidebar-bg);
     padding: 8px;
     border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
 }
 
 /* ---------- SIDEBAR OVERLAY (MOBIL) ---------- */
@@ -257,35 +316,12 @@ html, body {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0,0,0,0.45);
     z-index: 40;
+    backdrop-filter: blur(1px);
 }
 
-.sidebar-overlay.open { display: block; }
-
-/* ---------- RESPONSIVE (TELEFON) ---------- */
-@media (max-width: 720px) {
-    .hamburger-btn { display: flex; }
-
-    .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100vh;
-        z-index: 50;
-        transform: translateX(-100%);
-        transition: transform 0.25s ease;
-        box-shadow: 8px 0 24px rgba(0,0,0,0.15);
-    }
-
-    .sidebar.open {
-        transform: translateX(0);
-    }
-
-    .messages-box { padding: 20px 14px 12px; }
-    .input-row { padding: 12px 14px 20px; }
-    .message, .ai-message { max-width: 90%; }
-}
+.sidebar-overlay.open { display: block; animation: fade-in 0.2s ease; }
 
 /* ---------- GOOGLE LOGIN TUGMASI ---------- */
 .google-login-btn {
@@ -304,9 +340,11 @@ html, body {
     font-weight: 500;
     text-decoration: none;
     cursor: pointer;
+    transition: background 0.15s;
 }
 
 .google-login-btn:hover { background: var(--hover); }
+.google-login-btn:active { transform: scale(0.98); }
 
 .google-login-btn-modal { margin-top: 16px; }
 
@@ -318,16 +356,19 @@ html, body {
     padding: 8px;
     border-radius: 10px;
     cursor: pointer;
+    transition: background 0.15s;
 }
 
 .profile-card:hover { background: var(--hover); }
+.profile-card:active { transform: scale(0.98); }
 
 .profile-avatar {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
 }
 
 .profile-avatar-fallback {
@@ -364,16 +405,17 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     margin-bottom: 20px;
 }
 
 .profile-modal-avatar {
-    width: 64px;
-    height: 64px;
+    width: 68px;
+    height: 68px;
     border-radius: 50%;
     object-fit: cover;
-    font-size: 24px;
+    font-size: 26px;
+    box-shadow: var(--shadow-md);
 }
 
 .profile-modal-email {
@@ -401,6 +443,7 @@ html, body {
     color: var(--ink);
     outline: none;
     resize: none;
+    transition: border-color 0.15s;
 }
 
 .profile-field-textarea { min-height: 70px; }
@@ -411,7 +454,7 @@ html, body {
 .profile-save-btn {
     margin-top: 16px;
     width: 100%;
-    padding: 10px;
+    padding: 11px;
     border: none;
     border-radius: 10px;
     background: var(--accent);
@@ -420,9 +463,11 @@ html, body {
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
+    transition: opacity 0.15s;
 }
 
 .profile-save-btn:hover { opacity: 0.9; }
+.profile-save-btn:active { transform: scale(0.98); }
 
 .profile-save-status {
     display: block;
@@ -430,22 +475,25 @@ html, body {
     font-size: 12px;
     color: var(--ink-soft);
     margin-top: 8px;
+    min-height: 16px;
 }
 
 .logout-link {
     font-size: 13px;
     color: var(--accent);
     text-decoration: none;
+    font-weight: 500;
 }
 
 /* ---------- ANONIM XABAR CHEGARASI ---------- */
 .anon-limit-badge {
     margin-left: auto;
-    font-size: 12px;
+    font-size: 11.5px;
     color: var(--ink-soft);
     background: var(--sidebar-bg);
     padding: 4px 10px;
     border-radius: 12px;
+    white-space: nowrap;
 }
 
 .anon-limit-warning {
@@ -456,22 +504,22 @@ html, body {
 .login-required-text {
     font-size: 14px;
     color: var(--ink-soft);
-    line-height: 1.5;
+    line-height: 1.55;
     margin-top: 4px;
 }
 
 /* ---------- AVATAR YUKLASH ---------- */
 .avatar-upload-wrap {
     position: relative;
-    width: 64px;
+    width: 68px;
 }
 
 .avatar-edit-btn {
     position: absolute;
     bottom: -2px;
     right: -2px;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
     border: 2px solid var(--panel);
     background: var(--accent);
@@ -480,9 +528,11 @@ html, body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    box-shadow: var(--shadow-sm);
 }
 
 .avatar-edit-btn:hover { opacity: 0.9; }
+.avatar-edit-btn:active { transform: scale(0.9); }
 
 .avatar-remove-btn {
     border: none;
@@ -490,7 +540,95 @@ html, body {
     color: var(--accent);
     font-size: 12px;
     cursor: pointer;
-    margin-top: 4px;
+    margin-top: 2px;
 }
 
 .avatar-remove-btn:hover { text-decoration: underline; }
+
+/* ---------- RESPONSIVE (TELEFON) ---------- */
+@media (max-width: 720px) {
+    .hamburger-btn { display: flex; }
+
+    .chat-header {
+        padding: 12px 16px;
+        padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    }
+
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        height: calc(var(--vh, 1vh) * 100);
+        width: min(78vw, 280px);
+        z-index: 50;
+        transform: translateX(-100%);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: var(--shadow-lg);
+        padding-top: calc(18px + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .messages-box {
+        padding: 18px 14px 10px;
+        gap: 12px;
+    }
+
+    .message, .ai-message { max-width: 90%; font-size: 14.5px; }
+
+    .empty-state h2 { font-size: 19px; }
+
+    .input-row {
+        padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .input-shell {
+        border-radius: 20px;
+        padding: 4px 4px 4px 14px;
+    }
+
+    .input-shell input {
+        font-size: 16px; /* iOS'da avtomatik zoom bolmasligi uchun 16px minimal */
+        padding: 8px 0;
+    }
+
+    .send-btn {
+        width: 34px;
+        height: 34px;
+    }
+
+    .modal {
+        width: 100%;
+        border-radius: 18px 18px 0 0;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        max-height: 80vh;
+        padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+        animation: modal-slide-up 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    @keyframes modal-slide-up {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+    }
+
+    .anon-limit-badge {
+        font-size: 10.5px;
+        padding: 3px 8px;
+    }
+}
+
+@media (max-width: 380px) {
+    .messages-box { padding: 14px 10px 8px; }
+    .input-row { padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px)); }
+}
