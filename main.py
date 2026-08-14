@@ -8,6 +8,7 @@ if IS_RENDER:
 
 import base64
 import logging
+import itertools
 from datetime import datetime
 from functools import wraps
 from collections import deque
@@ -28,6 +29,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SECRET_KEY = os.getenv("SECRET_KEY", "notfic_secret_key_123")
 AI_MODEL = os.getenv("AI_MODEL", "llama-3.3-70b-versatile")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "notfic_admin_2026")
+ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or "").strip().lower()
 AI_NAME = "Notfic AI ⚡"
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -46,6 +48,8 @@ if not GROQ_API_KEY:
     logger.warning("GROQ_API_KEY topilmadi!")
 if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
     logger.warning("Google OAuth sozlanmagan!")
+if not ADMIN_EMAIL:
+    logger.warning("ADMIN_EMAIL sozlanmagan!")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
@@ -84,6 +88,7 @@ class User(db.Model):
     avatar = db.Column(db.String(500))
     custom_avatar = db.Column(db.Text, nullable=True)
     bio = db.Column(db.String(300), default='')
+    is_banned = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -98,7 +103,8 @@ stats = {
     "total_ai_messages": 0,
     "total_connections": 0,
 }
-public_history = deque(maxlen=50)
+public_history = deque(maxlen=200)
+public_msg_counter = itertools.count(1)
 
 anonymous_message_counts = {}
 
@@ -127,15 +133,6 @@ def get_ai_response(prompt: str) -> str:
         return f"🤖 [{AI_NAME}]: Hozir javob bera olmadim, birozdan so'ng qayta urinib ko'ring."
 
 
-def admin_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get('is_admin'):
-            return redirect(url_for('admin_login'))
-        return f(*args, **kwargs)
-    return decorated
-
-
 def current_user():
     user_id = session.get('user_id')
     if not user_id:
@@ -151,12 +148,35 @@ def get_display_avatar(user):
     return user.avatar
 
 
+def is_admin_user(user):
+    if not user or not ADMIN_EMAIL:
+        return False
+    return (user.email or '').strip().lower() == ADMIN_EMAIL
+
+
+def session_is_admin():
+    if session.get('is_admin'):
+        return True
+    return is_admin_user(current_user())
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session_is_admin():
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
 # ---------- ODDIY ROUTE'LAR ----------
 @app.route('/')
 def index():
     user = current_user()
     display_avatar = get_display_avatar(user) if user else None
-    return render_template('index.html', user=user, display_avatar=display_avatar, anon_limit=ANONYMOUS_MESSAGE_LIMIT)
+    is_admin = is_admin_user(user)
+    return render_template('index.html', user=user, display_avatar=display_avatar,
+                            anon_limit=ANONYMOUS_MESSAGE_LIMIT, is_admin=is_admin)
 
 
 @app.route('/health')
@@ -194,10 +214,19 @@ def google_callback():
         user.avatar = avatar
 
     db.session.commit()
+
+    if user.is_banned:
+        return redirect(url_for('banned_page'))
+
     session['user_id'] = user.id
 
     logger.info(f"Foydalanuvchi kirdi: {name} ({email})")
     return redirect(url_for('index'))
+
+
+@app.route('/banned')
+def banned_page():
+    return "Sizning hisobingiz bloklangan. Savollar bo'lsa, administratorga murojaat qiling.", 403
 
 
 @app.route('/auth/logout')
@@ -343,6 +372,62 @@ def admin_api_stats():
     })
 
 
+@app.route('/admin/api/users')
+@admin_required
+def admin_api_users():
+    search = (request.args.get('q') or '').strip().lower()
+    users = User.query.order_by(User.created_at.desc()).all()
+    if search:
+        users = [u for u in users if search in (u.name or '').lower() or search in (u.email or '').lower()]
+
+    return jsonify([{
+        "id": u.id,
+        "name": u.name,
+        "email": u.email,
+        "avatar": get_display_avatar(u),
+        "is_banned": u.is_banned,
+        "is_admin": is_admin_user(u),
+        "created_at": u.created_at.strftime("%Y-%m-%d") if u.created_at else ''
+    } for u in users])
+
+
+@app.route('/admin/api/users/<int:user_id>/ban', methods=['POST'])
+@admin_required
+def admin_toggle_ban(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "not_found"}), 404
+
+    if is_admin_user(user):
+        return jsonify({"error": "cannot_ban_admin"}), 400
+
+    user.is_banned = not user.is_banned
+    db.session.commit()
+
+    logger.info(f"Admin foydalanuvchini {'bloklandi' if user.is_banned else 'blokdan chiqarildi'}: {user.email}")
+
+    return jsonify({"success": True, "is_banned": user.is_banned})
+
+
+@app.route('/admin/api/messages/<int:msg_id>', methods=['DELETE'])
+@admin_required
+def admin_delete_message(msg_id):
+    global public_history
+    found = False
+    new_history = deque(maxlen=200)
+    for m in public_history:
+        if m.get('id') == msg_id:
+            found = True
+            continue
+        new_history.append(m)
+    public_history = new_history
+
+    if found:
+        socketio.emit('message_deleted', {'id': msg_id})
+
+    return jsonify({"success": found})
+
+
 # ---------- SOCKET.IO ----------
 @socketio.on('connect')
 def handle_connect():
@@ -362,8 +447,17 @@ def is_logged_in_session():
     return current_user() is not None
 
 
+def is_banned_session():
+    user = current_user()
+    return user.is_banned if user else False
+
+
 @socketio.on('ai_message')
 def handle_ai_message(data):
+    if is_banned_session():
+        emit('banned_notice', {'message': 'Hisobingiz bloklangan.'})
+        return
+
     username = (data.get('username') or 'Anonim').strip()[:50]
     msg = (data.get('message') or '').strip()[:2000]
     client_id = data.get('clientId')
@@ -395,6 +489,10 @@ def handle_ai_message(data):
 
 @socketio.on('public_message')
 def handle_public_message(data):
+    if is_banned_session():
+        emit('banned_notice', {'message': 'Hisobingiz bloklangan.'})
+        return
+
     username = (data.get('username') or 'Anonim').strip()[:50]
     msg = (data.get('message') or '').strip()[:2000]
     client_id = data.get('clientId')
@@ -414,7 +512,9 @@ def handle_public_message(data):
         emit('anon_limit_update', {'remaining': remaining})
 
     stats["total_public_messages"] += 1
+    msg_id = next(public_msg_counter)
     public_history.append({
+        "id": msg_id,
         "username": username,
         "message": msg,
         "time": datetime.utcnow().strftime("%H:%M:%S")
@@ -422,7 +522,9 @@ def handle_public_message(data):
 
     logger.info(f"[Ochiq] {username}: {msg}")
 
-    emit('public_response_message', {'username': username, 'message': msg, 'clientId': client_id}, broadcast=True)
+    emit('public_response_message',
+         {'id': msg_id, 'username': username, 'message': msg, 'clientId': client_id},
+         broadcast=True)
 
 
 if __name__ == '__main__':

@@ -27,16 +27,16 @@
                     <span class="stat-value" id="stat-online">{{ online_count }}</span>
                 </div>
                 <div class="stat-card">
+                    <span class="stat-label">👥 Jami foydalanuvchilar</span>
+                    <span class="stat-value" id="stat-users">{{ total_users }}</span>
+                </div>
+                <div class="stat-card">
                     <span class="stat-label">💬 Ochiq suhbat xabarlari</span>
                     <span class="stat-value" id="stat-public">{{ total_public }}</span>
                 </div>
                 <div class="stat-card">
                     <span class="stat-label">🤖 AI suhbatlari</span>
                     <span class="stat-value" id="stat-ai">{{ total_ai }}</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">🔌 Jami ulanishlar</span>
-                    <span class="stat-value" id="stat-connections">{{ total_connections }}</span>
                 </div>
                 <div class="stat-card">
                     <span class="stat-label">⏱ Server ishlab turgan vaqt</span>
@@ -55,12 +55,21 @@
             </div>
 
             <section class="history-section">
+                <h2>Foydalanuvchilar</h2>
+                <input type="text" id="user-search" class="user-search-input" placeholder="Ism yoki email boyicha qidirish..." oninput="loadUsers()">
+                <div class="user-list" id="user-list"></div>
+            </section>
+
+            <section class="history-section">
                 <h2>So'nggi Ochiq Suhbat xabarlari</h2>
                 <div class="history-list" id="history-list">
                     {% for h in history %}
                     <div class="history-item">
                         <span class="history-time">{{ h.time }}</span>
                         <strong>{{ h.username }}:</strong> {{ h.message }}
+                        <<button class="delete-msg-btn" data-id="{{ h.id }}" onclick="deleteMessage(this.dataset.id)">
+    O'chirish
+</button>
                     </div>
                     {% else %}
                     <div class="history-empty">Hali xabar yo'q</div>
@@ -81,7 +90,7 @@
                 document.getElementById('stat-online').textContent = data.online_count;
                 document.getElementById('stat-public').textContent = data.total_public;
                 document.getElementById('stat-ai').textContent = data.total_ai;
-                document.getElementById('stat-connections').textContent = data.total_connections;
+                document.getElementById('stat-users').textContent = data.total_users;
                 document.getElementById('stat-uptime').textContent = data.uptime;
 
                 const list = document.getElementById('history-list');
@@ -89,7 +98,7 @@
                     list.innerHTML = '<div class="history-empty">Hali xabar yoq</div>';
                 } else {
                     list.innerHTML = data.history.map(function(h) {
-                        return '<div class="history-item"><span class="history-time">' + h.time + '</span><strong>' + h.username + ':</strong> ' + h.message + '</div>';
+                        return '<div class="history-item"><span class="history-time">' + h.time + '</span><strong>' + h.username + ':</strong> ' + h.message + ' <button class="delete-msg-btn" onclick="deleteMessage(' + h.id + ')">O\'chirish</button></div>';
                     }).join('');
                 }
             } catch (e) {
@@ -97,6 +106,50 @@
             }
         }
 
+        async function loadUsers() {
+            const search = document.getElementById('user-search').value;
+            try {
+                const res = await fetch('/admin/api/users?q=' + encodeURIComponent(search));
+                const users = await res.json();
+                const list = document.getElementById('user-list');
+
+                if (users.length === 0) {
+                    list.innerHTML = '<div class="history-empty">Foydalanuvchi topilmadi</div>';
+                    return;
+                }
+
+                list.innerHTML = users.map(function (u) {
+                    return '<div class="user-item">' +
+                        '<span class="user-item-name">' + u.name + (u.is_admin ? ' 👑' : '') + '</span>' +
+                        '<span class="user-item-email">' + u.email + '</span>' +
+                        (u.is_admin ? '' : '<button class="ban-btn ' + (u.is_banned ? 'banned' : '') + '" onclick="toggleBan(' + u.id + ')">' + (u.is_banned ? 'Blokdan chiqarish' : 'Bloklash') + '</button>') +
+                        '</div>';
+                }).join('');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function toggleBan(userId) {
+            try {
+                await fetch('/admin/api/users/' + userId + '/ban', { method: 'POST' });
+                loadUsers();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function deleteMessage(msgId) {
+            if (!confirm('Bu xabarni ochirishni tasdiqlaysizmi?')) return;
+            try {
+                await fetch('/admin/api/messages/' + msgId, { method: 'DELETE' });
+                refreshStats();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        loadUsers();
         setInterval(refreshStats, 5000);
     </script>
 

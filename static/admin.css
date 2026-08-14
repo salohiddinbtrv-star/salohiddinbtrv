@@ -149,11 +149,63 @@ body {
 .status-ok { color: var(--ok); }
 .status-error { color: var(--err); }
 
+.history-section { margin-bottom: 28px; }
+
 .history-section h2 {
     font-size: 16px;
     font-weight: 600;
     margin-bottom: 14px;
 }
+
+.user-search-input {
+    width: 100%;
+    font-family: inherit;
+    font-size: 14px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--ink);
+    outline: none;
+    margin-bottom: 14px;
+}
+
+.user-search-input:focus { border-color: var(--accent); }
+
+.user-list {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.user-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+}
+
+.user-item:last-child { border-bottom: none; }
+
+.user-item-name { font-weight: 500; }
+.user-item-email { color: var(--ink-soft); font-size: 13px; flex: 1; }
+
+.ban-btn {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--err);
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.ban-btn.banned { color: var(--ok); }
 
 .history-list {
     background: var(--panel);
@@ -167,6 +219,9 @@ body {
     padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     font-size: 14px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .history-item:last-child { border-bottom: none; }
@@ -177,12 +232,23 @@ body {
     margin-right: 10px;
 }
 
+.delete-msg-btn {
+    border: none;
+    background: transparent;
+    color: var(--err);
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: 8px;
+}
+
 .history-empty {
     padding: 24px;
     text-align: center;
     color: var(--ink-soft);
     font-size: 14px;
 }
+
+.admin-link { color: var(--accent) !important; font-weight: 500; }
 
 @media (max-width: 640px) {
     .stats-grid { grid-template-columns: repeat(2, 1fr); }

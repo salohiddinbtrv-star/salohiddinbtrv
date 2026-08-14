@@ -155,6 +155,7 @@ function appendMessageToDOM(data) {
     const el = document.createElement('div');
     el.classList.add('message');
     if (data.isAI) el.classList.add('ai-message');
+    if (data.id) el.setAttribute('data-msg-id', data.id);
     el.innerHTML = '<strong>' + escapeHtml(data.username) + ':</strong> ' + escapeHtml(data.message);
     messagesBox.appendChild(el);
 }
@@ -222,6 +223,16 @@ function openLoginRequired() {
 function closeLoginRequired() {
     document.getElementById('login-required-modal').classList.remove('open');
 }
+
+socket.on('banned_notice', function (data) {
+    alert(data.message);
+});
+
+socket.on('message_deleted', function (data) {
+    const history = loadPublicHistory().filter(function (m) { return m.id !== data.id; });
+    savePublicHistory(history);
+    if (isPublicActive()) renderMessages();
+});
 
 /* ---------- SOCKET.IO: AI SUHBATI (shaxsiy) ---------- */
 socket.on('ai_response_message', function (data) {
