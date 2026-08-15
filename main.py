@@ -97,7 +97,7 @@ class FriendRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    status = db.Column(db.String(20), default='pending')  # pending, accepted, rejected
+    status = db.Column(db.String(20), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -498,6 +498,8 @@ def api_friend_messages(friend_id):
     if not are_friends(user.id, friend_id):
         return jsonify({"error": "not_friends"}), 403
 
+    friend = User.query.get(friend_id)
+
     msgs = DirectMessage.query.filter(
         db.or_(
             db.and_(DirectMessage.sender_id == user.id, DirectMessage.receiver_id == friend_id),
@@ -510,6 +512,7 @@ def api_friend_messages(friend_id):
         "sender_id": m.sender_id,
         "message": m.message,
         "is_mine": m.sender_id == user.id,
+        "avatar": get_display_avatar(user) if m.sender_id == user.id else get_display_avatar(friend),
         "time": m.created_at.strftime("%H:%M")
     } for m in msgs])
 
@@ -700,6 +703,7 @@ def handle_public_message(data):
         emit('banned_notice', {'message': 'Hisobingiz bloklangan.'})
         return
 
+    user = current_user()
     username = (data.get('username') or 'Anonim').strip()[:50]
     msg = (data.get('message') or '').strip()[:2000]
     client_id = data.get('clientId')
@@ -718,19 +722,22 @@ def handle_public_message(data):
         remaining = ANONYMOUS_MESSAGE_LIMIT - anonymous_message_counts[request.sid]
         emit('anon_limit_update', {'remaining': remaining})
 
+    avatar = get_display_avatar(user) if user else None
+
     stats["total_public_messages"] += 1
     msg_id = next(public_msg_counter)
     public_history.append({
         "id": msg_id,
         "username": username,
         "message": msg,
+        "avatar": avatar,
         "time": datetime.utcnow().strftime("%H:%M:%S")
     })
 
     logger.info(f"[Ochiq] {username}: {msg}")
 
     emit('public_response_message',
-         {'id': msg_id, 'username': username, 'message': msg, 'clientId': client_id},
+         {'id': msg_id, 'username': username, 'message': msg, 'avatar': avatar, 'clientId': client_id},
          broadcast=True)
 
 
@@ -762,6 +769,7 @@ def handle_friend_message(data):
         "to_user_id": int(to_id),
         "message": msg,
         "sender_name": user.name,
+        "sender_avatar": get_display_avatar(user),
         "time": row.created_at.strftime("%H:%M"),
         "clientId": client_id
     }
