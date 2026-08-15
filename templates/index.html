@@ -34,6 +34,19 @@
                 <div id="chat-list" class="chat-list"></div>
             </nav>
 
+            {% if user %}
+            <button class="new-chat-btn" onclick="openFriendSearch()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Do'st qo'shish
+            </button>
+
+            <nav class="sidebar-section">
+                <span class="sidebar-label">👥 Do'stlar</span>
+                <div id="friend-requests-list"></div>
+                <div id="friends-list" class="chat-list"></div>
+            </nav>
+            {% endif %}
+
             <div class="sidebar-footer">
 
                 {% if user %}
@@ -172,6 +185,20 @@
             </a>
         </div>
     </div>
+
+    <!-- DO'ST QIDIRISH MODAL -->
+    {% if user %}
+    <div id="friend-search-modal" class="modal-overlay" onclick="if(event.target===this) closeFriendSearch()">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Do'st qidirish</h3>
+                <button class="modal-close" onclick="closeFriendSearch()">X</button>
+            </div>
+            <input type="text" id="friend-search-input" class="profile-field-input" placeholder="Ism boyicha qidirish..." oninput="searchFriends()">
+            <div id="friend-search-results" class="friend-results"></div>
+        </div>
+    </div>
+    {% endif %}
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="/static/script.js"></script>

@@ -14,7 +14,7 @@ from functools import wraps
 from collections import deque
 
 from flask import Flask, render_template, session, request, redirect, url_for, jsonify
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, join_room
 from flask_sqlalchemy import SQLAlchemy
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
@@ -78,7 +78,7 @@ SYSTEM_PROMPT = (
 )
 
 
-# ---------- MODEL ----------
+# ---------- MODELLAR ----------
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -89,6 +89,24 @@ class User(db.Model):
     custom_avatar = db.Column(db.Text, nullable=True)
     bio = db.Column(db.String(300), default='')
     is_banned = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class FriendRequest(db.Model):
+    __tablename__ = 'friend_requests'
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending, accepted, rejected
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class DirectMessage(db.Model):
+    __tablename__ = 'direct_messages'
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    message = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -169,6 +187,25 @@ def admin_required(f):
     return decorated
 
 
+def login_required_api(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user():
+            return jsonify({"error": "login_required"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+def are_friends(user_id_a, user_id_b):
+    return FriendRequest.query.filter(
+        db.or_(
+            db.and_(FriendRequest.sender_id == user_id_a, FriendRequest.receiver_id == user_id_b),
+            db.and_(FriendRequest.sender_id == user_id_b, FriendRequest.receiver_id == user_id_a)
+        ),
+        FriendRequest.status == 'accepted'
+    ).first() is not None
+
+
 # ---------- ODDIY ROUTE'LAR ----------
 @app.route('/')
 def index():
@@ -244,6 +281,7 @@ def api_get_profile():
 
     return jsonify({
         "logged_in": True,
+        "id": user.id,
         "name": user.name,
         "email": user.email,
         "avatar": get_display_avatar(user),
@@ -310,6 +348,170 @@ def api_remove_avatar():
     db.session.commit()
 
     return jsonify({"success": True, "avatar": user.avatar})
+
+
+# ---------- DO'STLIK API ----------
+@app.route('/api/friends/search')
+@login_required_api
+def api_friends_search():
+    user = current_user()
+    q = (request.args.get('q') or '').strip()
+
+    if len(q) < 2:
+        return jsonify([])
+
+    results = User.query.filter(
+        User.name.ilike(f'%{q}%'),
+        User.id != user.id,
+        User.is_banned == False
+    ).limit(20).all()
+
+    output = []
+    for u in results:
+        status = 'none'
+        if are_friends(user.id, u.id):
+            status = 'friends'
+        else:
+            sent = FriendRequest.query.filter_by(sender_id=user.id, receiver_id=u.id, status='pending').first()
+            received = FriendRequest.query.filter_by(sender_id=u.id, receiver_id=user.id, status='pending').first()
+            if sent:
+                status = 'pending_sent'
+            elif received:
+                status = 'pending_received'
+
+        output.append({
+            "id": u.id,
+            "name": u.name,
+            "avatar": get_display_avatar(u),
+            "status": status
+        })
+
+    return jsonify(output)
+
+
+@app.route('/api/friends/request', methods=['POST'])
+@login_required_api
+def api_friend_request():
+    user = current_user()
+    data = request.get_json() or {}
+    to_id = data.get('user_id')
+
+    if not to_id or int(to_id) == user.id:
+        return jsonify({"error": "invalid_target"}), 400
+
+    target = User.query.get(to_id)
+    if not target:
+        return jsonify({"error": "not_found"}), 404
+
+    if are_friends(user.id, to_id):
+        return jsonify({"error": "already_friends"}), 400
+
+    existing = FriendRequest.query.filter_by(sender_id=user.id, receiver_id=to_id, status='pending').first()
+    if existing:
+        return jsonify({"error": "already_sent"}), 400
+
+    reverse = FriendRequest.query.filter_by(sender_id=to_id, receiver_id=user.id, status='pending').first()
+    if reverse:
+        return jsonify({"error": "they_already_sent"}), 400
+
+    req = FriendRequest(sender_id=user.id, receiver_id=to_id, status='pending')
+    db.session.add(req)
+    db.session.commit()
+
+    logger.info(f"Dostlik taklifi: {user.name} -> {target.name}")
+
+    return jsonify({"success": True})
+
+
+@app.route('/api/friends/requests')
+@login_required_api
+def api_friend_requests():
+    user = current_user()
+    requests_in = FriendRequest.query.filter_by(receiver_id=user.id, status='pending').all()
+
+    output = []
+    for r in requests_in:
+        sender = User.query.get(r.sender_id)
+        if not sender:
+            continue
+        output.append({
+            "request_id": r.id,
+            "user_id": sender.id,
+            "name": sender.name,
+            "avatar": get_display_avatar(sender)
+        })
+
+    return jsonify(output)
+
+
+@app.route('/api/friends/requests/<int:req_id>/respond', methods=['POST'])
+@login_required_api
+def api_friend_respond(req_id):
+    user = current_user()
+    data = request.get_json() or {}
+    action = data.get('action')
+
+    req = FriendRequest.query.get(req_id)
+    if not req or req.receiver_id != user.id:
+        return jsonify({"error": "not_found"}), 404
+
+    if action == 'accept':
+        req.status = 'accepted'
+    elif action == 'reject':
+        req.status = 'rejected'
+    else:
+        return jsonify({"error": "invalid_action"}), 400
+
+    db.session.commit()
+    return jsonify({"success": True, "status": req.status})
+
+
+@app.route('/api/friends')
+@login_required_api
+def api_friends_list():
+    user = current_user()
+    accepted = FriendRequest.query.filter(
+        db.or_(FriendRequest.sender_id == user.id, FriendRequest.receiver_id == user.id),
+        FriendRequest.status == 'accepted'
+    ).all()
+
+    output = []
+    for r in accepted:
+        other_id = r.receiver_id if r.sender_id == user.id else r.sender_id
+        other = User.query.get(other_id)
+        if not other:
+            continue
+        output.append({
+            "id": other.id,
+            "name": other.name,
+            "avatar": get_display_avatar(other)
+        })
+
+    return jsonify(output)
+
+
+@app.route('/api/friends/<int:friend_id>/messages')
+@login_required_api
+def api_friend_messages(friend_id):
+    user = current_user()
+
+    if not are_friends(user.id, friend_id):
+        return jsonify({"error": "not_friends"}), 403
+
+    msgs = DirectMessage.query.filter(
+        db.or_(
+            db.and_(DirectMessage.sender_id == user.id, DirectMessage.receiver_id == friend_id),
+            db.and_(DirectMessage.sender_id == friend_id, DirectMessage.receiver_id == user.id)
+        )
+    ).order_by(DirectMessage.created_at.asc()).limit(200).all()
+
+    return jsonify([{
+        "id": m.id,
+        "sender_id": m.sender_id,
+        "message": m.message,
+        "is_mine": m.sender_id == user.id,
+        "time": m.created_at.strftime("%H:%M")
+    } for m in msgs])
 
 
 # ---------- ADMIN ROUTE'LARI ----------
@@ -433,6 +635,11 @@ def admin_delete_message(msg_id):
 def handle_connect():
     connected_sids.add(request.sid)
     stats["total_connections"] += 1
+
+    user = current_user()
+    if user:
+        join_room(str(user.id))
+
     logger.info(f"Yangi foydalanuvchi ulandi. Hozir onlayn: {len(connected_sids)}")
 
 
@@ -525,6 +732,42 @@ def handle_public_message(data):
     emit('public_response_message',
          {'id': msg_id, 'username': username, 'message': msg, 'clientId': client_id},
          broadcast=True)
+
+
+@socketio.on('friend_message')
+def handle_friend_message(data):
+    user = current_user()
+    if not user or user.is_banned:
+        return
+
+    to_id = data.get('to_user_id')
+    msg = (data.get('message') or '').strip()[:2000]
+    client_id = data.get('clientId')
+
+    if not msg or not to_id:
+        return
+
+    if not are_friends(user.id, to_id):
+        return
+
+    row = DirectMessage(sender_id=user.id, receiver_id=to_id, message=msg)
+    db.session.add(row)
+    db.session.commit()
+
+    logger.info(f"[Dost xabari] {user.name} -> user#{to_id}: {msg}")
+
+    payload = {
+        "id": row.id,
+        "from_user_id": user.id,
+        "to_user_id": int(to_id),
+        "message": msg,
+        "sender_name": user.name,
+        "time": row.created_at.strftime("%H:%M"),
+        "clientId": client_id
+    }
+
+    emit('friend_message', payload, room=str(to_id))
+    emit('friend_message', payload, room=str(user.id))
 
 
 if __name__ == '__main__':
