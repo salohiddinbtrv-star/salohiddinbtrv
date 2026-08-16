@@ -35,6 +35,16 @@ function closeSidebar() {
     document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
+/* ---------- ILOVALAR MODAL ---------- */
+function openAppsModal() {
+    document.getElementById('apps-modal').classList.add('open');
+    closeSidebar();
+}
+
+function closeAppsModal() {
+    document.getElementById('apps-modal').classList.remove('open');
+}
+
 /* ---------- AI SUHBATLARINI SAQLASH ---------- */
 function loadChats() {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -645,16 +655,6 @@ function openSettings() {
 
 function closeSettings() {
     document.getElementById('settings-modal').classList.remove('open');
-
-    /* ---------- ILOVALAR MODAL ---------- */
-function openAppsModal() {
-    document.getElementById('apps-modal').classList.add('open');
-    closeSidebar();
-}
-
-function closeAppsModal() {
-    document.getElementById('apps-modal').classList.remove('open');
-}
 }
 
 /* ---------- PROFIL MODAL ---------- */
@@ -768,9 +768,9 @@ function updateAvatarImages(url) {
 window.addEventListener('DOMContentLoaded', function() {
     applyTheme(localStorage.getItem(THEME_KEY) || 'light');
 
-    if (!localStorage.getItem(ACTIVE_KEY) || getActiveChatId().indexOf('friend_') === 0) {
-        setActiveChatId(PUBLIC_ID);
-    }
+    // Har safar sahifa ochilganda Ochiq Suhbatdan boshlanadi.
+    // Eski AI suhbatlar sidebar'da saqlanib qoladi, faqat avtomatik ochilmaydi.
+    setActiveChatId(PUBLIC_ID);
 
     renderChatList();
     renderMessages();

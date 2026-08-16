@@ -9,7 +9,7 @@ if IS_RENDER:
 import base64
 import logging
 import itertools
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from collections import deque
 
@@ -38,7 +38,7 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 ANONYMOUS_MESSAGE_LIMIT = 10
 
 ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
-MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2MB
+MAX_AVATAR_SIZE = 2 * 1024 * 1024
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///notfic.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -55,6 +55,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 db = SQLAlchemy(app)
 
@@ -78,7 +79,6 @@ SYSTEM_PROMPT = (
 )
 
 
-# ---------- MODELLAR ----------
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -206,7 +206,6 @@ def are_friends(user_id_a, user_id_b):
     ).first() is not None
 
 
-# ---------- ODDIY ROUTE'LAR ----------
 @app.route('/')
 def index():
     user = current_user()
@@ -221,7 +220,6 @@ def health():
     return {"status": "ok", "ai_connected": ai_client is not None}, 200
 
 
-# ---------- GOOGLE LOGIN ----------
 @app.route('/auth/google/login')
 def google_login():
     redirect_uri = url_for('google_callback', _external=True)
@@ -256,6 +254,7 @@ def google_callback():
         return redirect(url_for('banned_page'))
 
     session['user_id'] = user.id
+    session.permanent = True
 
     logger.info(f"Foydalanuvchi kirdi: {name} ({email})")
     return redirect(url_for('index'))
@@ -272,7 +271,6 @@ def logout():
     return redirect(url_for('index'))
 
 
-# ---------- PROFIL API ----------
 @app.route('/api/profile', methods=['GET'])
 def api_get_profile():
     user = current_user()
@@ -350,7 +348,6 @@ def api_remove_avatar():
     return jsonify({"success": True, "avatar": user.avatar})
 
 
-# ---------- DO'STLIK API ----------
 @app.route('/api/friends/search')
 @login_required_api
 def api_friends_search():
@@ -517,7 +514,6 @@ def api_friend_messages(friend_id):
     } for m in msgs])
 
 
-# ---------- ADMIN ROUTE'LARI ----------
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     error = None
@@ -525,6 +521,7 @@ def admin_login():
         password = request.form.get('password', '')
         if password == ADMIN_PASSWORD:
             session['is_admin'] = True
+            session.permanent = True
             return redirect(url_for('admin_dashboard'))
         else:
             error = "Parol notogri"
@@ -633,7 +630,6 @@ def admin_delete_message(msg_id):
     return jsonify({"success": found})
 
 
-# ---------- SOCKET.IO ----------
 @socketio.on('connect')
 def handle_connect():
     connected_sids.add(request.sid)
