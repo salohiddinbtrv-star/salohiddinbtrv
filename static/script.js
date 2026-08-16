@@ -15,6 +15,7 @@ const ANON_LIMIT = parseInt(document.body.getAttribute('data-anon-limit') || '10
 
 let isConnected = false;
 const sentMessageIds = new Set();
+let lastRenderedKey = null;
 
 /* ---------- MOBIL BALANDLIK TUZATISH ---------- */
 function setViewportHeight() {
@@ -81,7 +82,7 @@ function updateHeader() {
         document.getElementById('public-chat-item').classList.add('active');
     } else {
         const activeId = getActiveChatId();
-        if (activeId.indexOf('friend_') === 0) return; // friend chat updates its own header
+        if (activeId.indexOf('friend_') === 0) return;
         const chats = loadChats();
         const chat = chats[activeId];
         chatHeaderTitle.textContent = '🤖 ' + (chat ? chat.title : 'AI suhbat');
@@ -132,9 +133,10 @@ function savePublicHistory(list) {
 /* ---------- EKRANGA CHIQARISH ---------- */
 function renderMessages() {
     const activeId = getActiveChatId();
-    if (activeId.indexOf('friend_') === 0) return; // friend chats render separately
+    if (activeId.indexOf('friend_') === 0) return;
 
     messagesBox.innerHTML = '';
+    lastRenderedKey = null;
 
     if (isPublicActive()) {
         const history = loadPublicHistory();
@@ -142,7 +144,7 @@ function renderMessages() {
             messagesBox.innerHTML = '<div class="empty-state"><h2>Ochiq Suhbat</h2><p>Bu yerga yozgan xabaringizni saytdagi hamma korishi mumkin.</p></div>';
             return;
         }
-        history.forEach(appendMessageToDOM);
+        history.forEach(function (m) { appendMessageToDOM(m, false); });
     } else {
         const chats = loadChats();
         const chat = chats[activeId];
@@ -150,19 +152,45 @@ function renderMessages() {
             messagesBox.innerHTML = '<div class="empty-state"><h2>Nima bilan yordam beray?</h2><p>Bu suhbat faqat sizga korinadi.</p></div>';
             return;
         }
-        chat.messages.forEach(appendMessageToDOM);
+        chat.messages.forEach(function (m) { appendMessageToDOM(m, false); });
     }
 
     messagesBox.scrollTop = messagesBox.scrollHeight;
 }
 
-function appendMessageToDOM(data) {
-    const el = document.createElement('div');
-    el.classList.add('message');
-    if (data.isAI) el.classList.add('ai-message');
-    if (data.id) el.setAttribute('data-msg-id', data.id);
-    el.innerHTML = '<strong>' + escapeHtml(data.username) + ':</strong> ' + escapeHtml(data.message);
-    messagesBox.appendChild(el);
+function avatarHtmlFor(data) {
+    if (data.isAI) {
+        return '<div class="msg-avatar msg-avatar-ai">⚡</div>';
+    }
+    if (data.avatar) {
+        return '<img src="' + data.avatar + '" class="msg-avatar" alt="">';
+    }
+    const initial = data.username ? data.username[0].toUpperCase() : '?';
+    return '<div class="msg-avatar msg-avatar-fallback">' + initial + '</div>';
+}
+
+function appendMessageToDOM(data, animate) {
+    const groupKey = (data.isAI ? 'ai' : 'user') + '::' + data.username;
+    const isGrouped = (groupKey === lastRenderedKey);
+    lastRenderedKey = groupKey;
+
+    const row = document.createElement('div');
+    row.className = 'message-row' + (data.isAI ? ' ai-row' : ' user-row') + (isGrouped ? ' grouped' : '');
+    if (animate) row.classList.add('msg-enter');
+    if (data.id) row.setAttribute('data-msg-id', data.id);
+
+    const avatarHtml = isGrouped ? '<div class="msg-avatar-spacer"></div>' : avatarHtmlFor(data);
+
+    const nameHtml = isGrouped ? '' : '<strong>' + escapeHtml(data.username) + '</strong>';
+
+    row.innerHTML =
+        avatarHtml +
+        '<div class="message-bubble-wrap">' +
+            nameHtml +
+            '<div class="message">' + escapeHtml(data.message) + '</div>' +
+        '</div>';
+
+    messagesBox.appendChild(row);
 }
 
 function escapeHtml(str) {
@@ -173,7 +201,10 @@ function escapeHtml(str) {
 
 function clearEmptyState() {
     const empty = messagesBox.querySelector('.empty-state');
-    if (empty) messagesBox.innerHTML = '';
+    if (empty) {
+        messagesBox.innerHTML = '';
+        lastRenderedKey = null;
+    }
 }
 
 /* ---------- ULANISH HOLATI ---------- */
@@ -259,7 +290,11 @@ socket.on('ai_response_message', function (data) {
     chat.messages.push(data);
     saveChats(chats);
     renderChatList();
-    if (getActiveChatId() === activeId) renderMessages();
+    if (getActiveChatId() === activeId) {
+        clearEmptyState();
+        appendMessageToDOM(data, true);
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+    }
     updateHeader();
 });
 
@@ -274,11 +309,17 @@ socket.on('ai_typing', function (data) {
 function showTypingIndicator() {
     hideTypingIndicator();
     clearEmptyState();
-    const el = document.createElement('div');
-    el.className = 'message ai-message typing-indicator';
-    el.id = 'typing-indicator';
-    el.innerHTML = '<strong>Notfic AI ⚡:</strong> <span class="typing-dots"><span></span><span></span><span></span></span>';
-    messagesBox.appendChild(el);
+    const row = document.createElement('div');
+    row.className = 'message-row ai-row';
+    row.id = 'typing-indicator';
+    row.innerHTML =
+        '<div class="msg-avatar msg-avatar-ai">⚡</div>' +
+        '<div class="message-bubble-wrap">' +
+            '<strong>Notfic AI</strong>' +
+            '<div class="message typing-indicator"><span class="typing-dots"><span></span><span></span><span></span></span></div>' +
+        '</div>';
+    messagesBox.appendChild(row);
+    lastRenderedKey = null;
     messagesBox.scrollTop = messagesBox.scrollHeight;
 }
 
@@ -300,7 +341,7 @@ socket.on('public_response_message', function (data) {
 
     if (isPublicActive()) {
         clearEmptyState();
-        appendMessageToDOM(data);
+        appendMessageToDOM(data, true);
         messagesBox.scrollTop = messagesBox.scrollHeight;
     }
 });
@@ -449,7 +490,7 @@ async function loadFriendsList() {
             item.className = 'chat-item' + (getActiveChatId() === ('friend_' + f.id) ? ' active' : '');
             item.textContent = f.name;
             item.onclick = function () {
-                switchToFriend(f.id, f.name);
+                switchToFriend(f.id, f.name, f.avatar);
             };
             el.appendChild(item);
         });
@@ -458,7 +499,7 @@ async function loadFriendsList() {
     }
 }
 
-async function switchToFriend(friendId, friendName) {
+async function switchToFriend(friendId, friendName, friendAvatar) {
     setActiveChatId('friend_' + friendId);
     chatHeaderTitle.textContent = '👤 ' + friendName;
     document.getElementById('public-chat-item').classList.remove('active');
@@ -466,12 +507,15 @@ async function switchToFriend(friendId, friendName) {
     closeSidebar();
 
     messagesBox.innerHTML = '<div class="empty-state"><p>Yuklanmoqda...</p></div>';
+    lastRenderedKey = null;
 
     try {
         const res = await fetch('/api/friends/' + friendId + '/messages');
         const msgs = await res.json();
 
         messagesBox.innerHTML = '';
+        lastRenderedKey = null;
+
         if (msgs.length === 0) {
             messagesBox.innerHTML = '<div class="empty-state"><h2>' + escapeHtml(friendName) + '</h2><p>Hali xabar yoq, birinchi bolib yozing 👋</p></div>';
             return;
@@ -481,8 +525,9 @@ async function switchToFriend(friendId, friendName) {
             appendMessageToDOM({
                 username: m.is_mine ? 'Siz' : friendName,
                 message: m.message,
+                avatar: m.avatar,
                 isAI: false
-            });
+            }, false);
         });
         messagesBox.scrollTop = messagesBox.scrollHeight;
     } catch (e) {
@@ -504,8 +549,9 @@ socket.on('friend_message', function (data) {
         appendMessageToDOM({
             username: data.sender_name,
             message: data.message,
+            avatar: data.sender_avatar,
             isAI: false
-        });
+        }, true);
         messagesBox.scrollTop = messagesBox.scrollHeight;
     }
 });
@@ -530,17 +576,26 @@ function sendMessage() {
     if (activeId.indexOf('friend_') === 0) {
         const friendId = parseInt(activeId.replace('friend_', ''), 10);
         clearEmptyState();
-        appendMessageToDOM({ username: 'Siz', message: message, isAI: false });
+        const myAvatar = document.getElementById('sidebar-avatar-img');
+        appendMessageToDOM({
+            username: 'Siz',
+            message: message,
+            avatar: (myAvatar && myAvatar.tagName === 'IMG') ? myAvatar.src : null,
+            isAI: false
+        }, true);
         messagesBox.scrollTop = messagesBox.scrollHeight;
         socket.emit('friend_message', { to_user_id: friendId, message: message, clientId: clientId });
         messageInput.value = '';
         return;
     }
 
-    const localData = { username: username, message: message, isAI: false, clientId: clientId };
+    const myAvatarEl = document.getElementById('sidebar-avatar-img');
+    const myAvatar = (myAvatarEl && myAvatarEl.tagName === 'IMG') ? myAvatarEl.src : null;
+
+    const localData = { username: username, message: message, avatar: myAvatar, isAI: false, clientId: clientId };
 
     clearEmptyState();
-    appendMessageToDOM(localData);
+    appendMessageToDOM(localData, true);
     messagesBox.scrollTop = messagesBox.scrollHeight;
 
     if (isPublicActive()) {
@@ -590,6 +645,16 @@ function openSettings() {
 
 function closeSettings() {
     document.getElementById('settings-modal').classList.remove('open');
+
+    /* ---------- ILOVALAR MODAL ---------- */
+function openAppsModal() {
+    document.getElementById('apps-modal').classList.add('open');
+    closeSidebar();
+}
+
+function closeAppsModal() {
+    document.getElementById('apps-modal').classList.remove('open');
+}
 }
 
 /* ---------- PROFIL MODAL ---------- */
@@ -703,21 +768,13 @@ function updateAvatarImages(url) {
 window.addEventListener('DOMContentLoaded', function() {
     applyTheme(localStorage.getItem(THEME_KEY) || 'light');
 
-    if (!localStorage.getItem(ACTIVE_KEY)) {
+    if (!localStorage.getItem(ACTIVE_KEY) || getActiveChatId().indexOf('friend_') === 0) {
         setActiveChatId(PUBLIC_ID);
     }
 
-    const startId = getActiveChatId();
-    if (startId.indexOf('friend_') !== 0) {
-        renderChatList();
-        renderMessages();
-        updateHeader();
-    } else {
-        setActiveChatId(PUBLIC_ID);
-        renderChatList();
-        renderMessages();
-        updateHeader();
-    }
+    renderChatList();
+    renderMessages();
+    updateHeader();
 
     if (!IS_LOGGED_IN) {
         const savedUsername = localStorage.getItem('notfic_username');

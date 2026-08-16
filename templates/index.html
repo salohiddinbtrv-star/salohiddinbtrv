@@ -34,6 +34,11 @@
                 <div id="chat-list" class="chat-list"></div>
             </nav>
 
+            <button class="new-chat-btn" onclick="openAppsModal()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>
+                Ilovalar
+            </button>
+
             {% if user %}
             <button class="new-chat-btn" onclick="openFriendSearch()">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -199,6 +204,66 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- ILOVALAR MODAL -->
+    <div id="apps-modal" class="modal-overlay" onclick="if(event.target===this) closeAppsModal()">
+        <div class="modal apps-modal-box">
+            <div class="modal-header">
+                <h3>Ilovalar</h3>
+                <button class="modal-close" onclick="closeAppsModal()">X</button>
+            </div>
+            <div class="apps-grid">
+                <a href="https://www.google.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#4285F4">🔍</div>
+                    <span>Google</span>
+                </a>
+                <a href="https://www.youtube.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#FF0000">▶️</div>
+                    <span>YouTube</span>
+                </a>
+                <a href="https://mail.google.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#EA4335">✉️</div>
+                    <span>Gmail</span>
+                </a>
+                <a href="https://www.instagram.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:linear-gradient(45deg,#F58529,#DD2A7B,#8134AF)">📷</div>
+                    <span>Instagram</span>
+                </a>
+                <a href="https://telegram.org" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#26A5E4">✈️</div>
+                    <span>Telegram</span>
+                </a>
+                <a href="https://web.whatsapp.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#25D366">💬</div>
+                    <span>WhatsApp</span>
+                </a>
+                <a href="https://www.facebook.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#1877F2">👥</div>
+                    <span>Facebook</span>
+                </a>
+                <a href="https://twitter.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#000000">𝕏</div>
+                    <span>X (Twitter)</span>
+                </a>
+                <a href="https://www.netflix.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#E50914">🎬</div>
+                    <span>Netflix</span>
+                </a>
+                <a href="https://open.spotify.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#1DB954">🎵</div>
+                    <span>Spotify</span>
+                </a>
+                <a href="https://maps.google.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#34A853">🗺️</div>
+                    <span>Maps</span>
+                </a>
+                <a href="https://drive.google.com" target="_blank" rel="noopener" class="app-tile">
+                    <div class="app-icon" style="background:#FFC107">📁</div>
+                    <span>Drive</span>
+                </a>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="/static/script.js"></script>

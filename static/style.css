@@ -799,3 +799,54 @@ html, body {
     .messages-box { padding: 14px 10px 8px; }
     .input-row { padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px)); }
 }
+/* ---------- ILOVALAR MODAL ---------- */
+.apps-modal-box {
+    width: 380px;
+}
+
+.apps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.app-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    color: var(--ink);
+    padding: 10px 6px;
+    border-radius: 12px;
+    transition: background 0.15s, transform 0.1s;
+}
+
+.app-tile:hover { background: var(--hover); }
+.app-tile:active { transform: scale(0.95); }
+
+.app-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    box-shadow: var(--shadow-sm);
+}
+
+.app-tile span {
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+@media (max-width: 480px) {
+    .apps-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .app-icon { width: 42px; height: 42px; font-size: 19px; }
+}
