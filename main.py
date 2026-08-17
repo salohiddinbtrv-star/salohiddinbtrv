@@ -127,20 +127,28 @@ public_msg_counter = itertools.count(1)
 anonymous_message_counts = {}
 
 
-def get_ai_response(prompt: str) -> str:
+def get_ai_response(prompt: str, context=None) -> str:
     if not ai_client:
         return f"🤖 [{AI_NAME}]: Hozircha AI ulanmagan — server tomonida API kalit sozlanmagan."
 
     if not prompt or not prompt.strip():
         return f"🤖 [{AI_NAME}]: Savolingizni yozing, men yordam berishga tayyorman!"
 
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    if context:
+        for item in context[-14:]:
+            role = "assistant" if item.get("isAI") else "user"
+            text = (item.get("message") or "").strip()
+            if text:
+                messages.append({"role": role, "content": text})
+
+    messages.append({"role": "user", "content": prompt.strip()})
+
     try:
         completion = ai_client.chat.completions.create(
             model=AI_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt.strip()}
-            ],
+            messages=messages,
             temperature=0.7,
             max_tokens=1024
         )
@@ -667,6 +675,7 @@ def handle_ai_message(data):
     username = (data.get('username') or 'Anonim').strip()[:50]
     msg = (data.get('message') or '').strip()[:2000]
     client_id = data.get('clientId')
+    context = data.get('context') or []
 
     if not msg:
         return
@@ -688,7 +697,7 @@ def handle_ai_message(data):
     emit('ai_response_message', {'username': username, 'message': msg, 'isAI': False, 'clientId': client_id})
 
     emit('ai_typing', {'typing': True})
-    ai_reply = get_ai_response(msg)
+    ai_reply = get_ai_response(msg, context)
     emit('ai_typing', {'typing': False})
     emit('ai_response_message', {'username': AI_NAME, 'message': ai_reply, 'isAI': True})
 

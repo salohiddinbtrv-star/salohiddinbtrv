@@ -622,6 +622,10 @@ function sendMessage() {
             setActiveChatId(chatId);
         }
         const chat = chats[chatId];
+
+        // AI'ga oldingi xabarlarni kontekst sifatida yuboramiz (oxirgi 14 tasi)
+        const context = chat.messages.slice(-14);
+
         chat.messages.push(localData);
         if (chat.title === 'Yangi AI suhbat') {
             chat.title = message.slice(0, 28) + (message.length > 28 ? '...' : '');
@@ -630,7 +634,7 @@ function sendMessage() {
         renderChatList();
         updateHeader();
 
-        socket.emit('ai_message', { username: username, message: message, clientId: clientId });
+        socket.emit('ai_message', { username: username, message: message, clientId: clientId, context: context });
     }
 
     messageInput.value = '';
@@ -768,8 +772,6 @@ function updateAvatarImages(url) {
 window.addEventListener('DOMContentLoaded', function() {
     applyTheme(localStorage.getItem(THEME_KEY) || 'light');
 
-    // Har safar sahifa ochilganda Ochiq Suhbatdan boshlanadi.
-    // Eski AI suhbatlar sidebar'da saqlanib qoladi, faqat avtomatik ochilmaydi.
     setActiveChatId(PUBLIC_ID);
 
     renderChatList();
