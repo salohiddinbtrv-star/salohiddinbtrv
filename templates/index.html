@@ -30,7 +30,12 @@
             </button>
 
             <nav class="sidebar-section">
-                <span class="sidebar-label">🤖 AI bilan suhbatlarim</span>
+                <span class="sidebar-label chat-list-label">
+                    <span>🤖 AI bilan suhbatlarim</span>
+                    <button class="chat-list-toggle-arrow" id="chat-list-toggle-btn" onclick="toggleChatListExpand()" aria-label="Kop suhbatlarni korsatish" style="display:none">
+                        <svg class="chevron-icon" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </span>
                 <div id="chat-list" class="chat-list"></div>
             </nav>
 
@@ -40,16 +45,11 @@
             </button>
 
             {% if user %}
-            <button class="new-chat-btn" onclick="openFriendSearch()">
+            <button class="new-chat-btn" onclick="openFriendsModal()">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Do'st qo'shish
+                Do'stlar
+                <span id="friend-request-badge" class="sidebar-badge" style="display:none"></span>
             </button>
-
-            <nav class="sidebar-section">
-                <span class="sidebar-label">👥 Do'stlar</span>
-                <div id="friend-requests-list"></div>
-                <div id="friends-list" class="chat-list"></div>
-            </nav>
             {% endif %}
 
             <div class="sidebar-footer">
@@ -191,14 +191,21 @@
         </div>
     </div>
 
-    <!-- DO'ST QIDIRISH MODAL -->
+    <!-- DO'STLAR MODALI (yagona bolim: sorovlar + royxat + qidirish/taklif) -->
     {% if user %}
-    <div id="friend-search-modal" class="modal-overlay" onclick="if(event.target===this) closeFriendSearch()">
-        <div class="modal">
+    <div id="friends-modal" class="modal-overlay" onclick="if(event.target===this) closeFriendsModal()">
+        <div class="modal friends-modal-box">
             <div class="modal-header">
-                <h3>Do'st qidirish</h3>
-                <button class="modal-close" onclick="closeFriendSearch()">X</button>
+                <h3>👥 Do'stlar</h3>
+                <button class="modal-close" onclick="closeFriendsModal()">X</button>
             </div>
+
+            <div id="friend-requests-list"></div>
+
+            <div class="friends-section-title">Mening do'stlarim</div>
+            <div id="friends-list-modal" class="friend-results"></div>
+
+            <div class="friends-section-title">Yangi do'st qidirish</div>
             <input type="text" id="friend-search-input" class="profile-field-input" placeholder="Ism boyicha qidirish..." oninput="searchFriends()">
             <div id="friend-search-results" class="friend-results"></div>
         </div>

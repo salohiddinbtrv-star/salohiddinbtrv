@@ -16,6 +16,7 @@ const ANON_LIMIT = parseInt(document.body.getAttribute('data-anon-limit') || '10
 let isConnected = false;
 const sentMessageIds = new Set();
 let lastRenderedKey = null;
+let cachedFriendsList = [];
 
 /* ---------- MOBIL BALANDLIK TUZATISH ---------- */
 function setViewportHeight() {
@@ -100,35 +101,77 @@ function updateHeader() {
     }
 }
 
+/* ---------- AI SUHBATLAR RO'YXATI (yigiladigan) ---------- */
+const CHAT_LIST_VISIBLE_COUNT = 4;
+let chatListExpanded = false;
+
+function makeChatListItem(id, chats, activeId) {
+    const chat = chats[id];
+    const item = document.createElement('div');
+    item.className = 'chat-item' + (id === activeId ? ' active' : '');
+    item.textContent = chat.title;
+    item.onclick = (function (chatId) {
+        return function () {
+            setActiveChatId(chatId);
+            renderChatList();
+            renderMessages();
+            updateHeader();
+            closeSidebar();
+        };
+    })(id);
+    return item;
+}
+
 function renderChatList() {
     const chats = loadChats();
     const activeId = getActiveChatId();
     const ids = Object.keys(chats).sort(function(a, b) { return b.localeCompare(a); });
 
     chatList.innerHTML = '';
+    const toggleBtn = document.getElementById('chat-list-toggle-btn');
 
     if (ids.length === 0) {
         chatList.innerHTML = '<span class="sidebar-empty">Hali AI suhbat yoq</span>';
+        if (toggleBtn) toggleBtn.style.display = 'none';
         return;
     }
 
-    for (let i = 0; i < ids.length; i++) {
-        const id = ids[i];
-        const chat = chats[id];
-        const item = document.createElement('div');
-        item.className = 'chat-item' + (id === activeId ? ' active' : '');
-        item.textContent = chat.title;
-        item.onclick = (function(chatId) {
-            return function() {
-                setActiveChatId(chatId);
-                renderChatList();
-                renderMessages();
-                updateHeader();
-                closeSidebar();
-            };
-        })(id);
-        chatList.appendChild(item);
+    const visibleIds = ids.slice(0, CHAT_LIST_VISIBLE_COUNT);
+    const extraIds = ids.slice(CHAT_LIST_VISIBLE_COUNT);
+
+    visibleIds.forEach(function (id) {
+        chatList.appendChild(makeChatListItem(id, chats, activeId));
+    });
+
+    if (extraIds.length > 0) {
+        const outer = document.createElement('div');
+        outer.className = 'chat-list-extra-outer' + (chatListExpanded ? ' expanded' : '');
+        outer.id = 'chat-list-extra-outer';
+
+        const inner = document.createElement('div');
+        inner.className = 'chat-list-extra-inner';
+        extraIds.forEach(function (id) {
+            inner.appendChild(makeChatListItem(id, chats, activeId));
+        });
+        outer.appendChild(inner);
+        chatList.appendChild(outer);
+
+        if (toggleBtn) {
+            toggleBtn.style.display = 'inline-flex';
+            toggleBtn.classList.toggle('expanded', chatListExpanded);
+        }
+    } else if (toggleBtn) {
+        toggleBtn.style.display = 'none';
+        toggleBtn.classList.remove('expanded');
     }
+}
+
+function toggleChatListExpand() {
+    chatListExpanded = !chatListExpanded;
+    const outer = document.getElementById('chat-list-extra-outer');
+    const btn = document.getElementById('chat-list-toggle-btn');
+    if (outer) outer.classList.toggle('expanded', chatListExpanded);
+    if (btn) btn.classList.toggle('expanded', chatListExpanded);
 }
 
 /* ---------- OCHIQ SUHBAT TARIXI ---------- */
@@ -179,6 +222,35 @@ function avatarHtmlFor(data) {
     return '<div class="msg-avatar msg-avatar-fallback">' + initial + '</div>';
 }
 
+function buildFeedbackHtml(data) {
+    const p = encodeURIComponent(data.prompt || '');
+    const r = encodeURIComponent(data.message || '');
+    return '<div class="ai-feedback">' +
+        '<button class="feedback-btn" onclick="sendAIFeedback(\'' + p + '\',\'' + r + '\',1,this)" aria-label="Yoqdi">👍</button>' +
+        '<button class="feedback-btn" onclick="sendAIFeedback(\'' + p + '\',\'' + r + '\',-1,this)" aria-label="Yoqmadi">👎</button>' +
+        '</div>';
+}
+
+async function sendAIFeedback(promptEnc, respEnc, rating, btnEl) {
+    const wrap = btnEl.parentElement;
+    wrap.querySelectorAll('.feedback-btn').forEach(function (b) { b.disabled = true; });
+    btnEl.classList.add('feedback-selected');
+
+    try {
+        await fetch('/api/ai/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: decodeURIComponent(promptEnc),
+                response: decodeURIComponent(respEnc),
+                rating: rating
+            })
+        });
+    } catch (e) {
+        console.error(e);
+    }
+}
+
 function appendMessageToDOM(data, animate) {
     const groupKey = (data.isAI ? 'ai' : 'user') + '::' + data.username;
     const isGrouped = (groupKey === lastRenderedKey);
@@ -193,11 +265,14 @@ function appendMessageToDOM(data, animate) {
 
     const nameHtml = isGrouped ? '' : '<strong>' + escapeHtml(data.username) + '</strong>';
 
+    const feedbackHtml = data.isAI ? buildFeedbackHtml(data) : '';
+
     row.innerHTML =
         avatarHtml +
         '<div class="message-bubble-wrap">' +
             nameHtml +
             '<div class="message">' + escapeHtml(data.message) + '</div>' +
+            feedbackHtml +
         '</div>';
 
     messagesBox.appendChild(row);
@@ -248,6 +323,19 @@ function hideConnectionBanner() {
     if (banner) banner.remove();
 }
 
+/* ---------- BILDIRISHNOMA TOAST ---------- */
+function showNotificationToast(text) {
+    const toast = document.createElement('div');
+    toast.className = 'notf-toast';
+    toast.textContent = text;
+    document.body.appendChild(toast);
+    setTimeout(function () { toast.classList.add('show'); }, 10);
+    setTimeout(function () {
+        toast.classList.remove('show');
+        setTimeout(function () { toast.remove(); }, 300);
+    }, 3500);
+}
+
 /* ---------- ANONIM XABAR CHEGARASI ---------- */
 socket.on('anon_limit_update', function (data) {
     if (IS_LOGGED_IN) return;
@@ -278,6 +366,25 @@ socket.on('message_deleted', function (data) {
     const history = loadPublicHistory().filter(function (m) { return m.id !== data.id; });
     savePublicHistory(history);
     if (isPublicActive()) renderMessages();
+});
+
+/* ---------- SOCKET.IO: DO'STLIK BILDIRISHNOMALARI (real-vaqt) ---------- */
+socket.on('friend_request_received', function (data) {
+    loadFriendRequests();
+    showNotificationToast(data.name + ' sizga dostlik taklifi yubordi');
+});
+
+socket.on('friend_request_accepted', function (data) {
+    loadFriendsListModal();
+    showNotificationToast(data.name + ' taklifingizni qabul qildi');
+});
+
+socket.on('friend_removed', function (data) {
+    loadFriendsListModal();
+    if (getActiveChatId() === ('friend_' + data.user_id)) {
+        switchToPublic();
+        showNotificationToast('Bu foydalanuvchi sizni dostlar royxatidan chiqardi');
+    }
 });
 
 /* ---------- SOCKET.IO: AI SUHBATI (shaxsiy) ---------- */
@@ -356,18 +463,22 @@ socket.on('public_response_message', function (data) {
     }
 });
 
-/* ---------- DO'STLIK TIZIMI ---------- */
+/* ---------- DO'STLAR BO'LIMI (yagona modal: sorovlar + royxat + qidirish) ---------- */
 let searchDebounceTimer = null;
 
-function openFriendSearch() {
-    document.getElementById('friend-search-modal').classList.add('open');
-    document.getElementById('friend-search-input').focus();
+function openFriendsModal() {
+    document.getElementById('friends-modal').classList.add('open');
+    closeSidebar();
+    loadFriendRequests();
+    loadFriendsListModal();
 }
 
-function closeFriendSearch() {
-    document.getElementById('friend-search-modal').classList.remove('open');
-    document.getElementById('friend-search-input').value = '';
-    document.getElementById('friend-search-results').innerHTML = '';
+function closeFriendsModal() {
+    document.getElementById('friends-modal').classList.remove('open');
+    const searchInput = document.getElementById('friend-search-input');
+    const searchResults = document.getElementById('friend-search-results');
+    if (searchInput) searchInput.value = '';
+    if (searchResults) searchResults.innerHTML = '';
 }
 
 function searchFriends() {
@@ -444,6 +555,17 @@ async function loadFriendRequests() {
     try {
         const res = await fetch('/api/friends/requests');
         const requests = await res.json();
+
+        const badge = document.getElementById('friend-request-badge');
+        if (badge) {
+            if (requests.length > 0) {
+                badge.textContent = requests.length;
+                badge.style.display = 'inline-flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
         const el = document.getElementById('friend-requests-list');
         if (!el) return;
 
@@ -476,36 +598,68 @@ async function respondFriendRequest(reqId, action) {
             body: JSON.stringify({ action: action })
         });
         loadFriendRequests();
-        if (action === 'accept') loadFriendsList();
+        if (action === 'accept') loadFriendsListModal();
     } catch (e) {
         console.error(e);
     }
 }
 
-async function loadFriendsList() {
+async function loadFriendsListModal() {
     try {
         const res = await fetch('/api/friends');
         const friends = await res.json();
-        const el = document.getElementById('friends-list');
+        cachedFriendsList = friends;
+
+        const el = document.getElementById('friends-list-modal');
         if (!el) return;
 
         if (friends.length === 0) {
-            el.innerHTML = '<span class="sidebar-empty">Hali dostlar yoq</span>';
+            el.innerHTML = '<div class="sidebar-empty">Hali dostlar yoq. Pastdan qidirib toping!</div>';
             return;
         }
 
-        el.innerHTML = '';
-        friends.forEach(function (f) {
-            const item = document.createElement('div');
-            item.className = 'chat-item' + (getActiveChatId() === ('friend_' + f.id) ? ' active' : '');
-            item.textContent = f.name;
-            item.onclick = function () {
-                switchToFriend(f.id, f.name, f.avatar);
-            };
-            el.appendChild(item);
-        });
+        el.innerHTML = friends.map(function (f) {
+            const avatarHtml = f.avatar
+                ? '<img src="' + f.avatar + '" class="friend-result-avatar" alt="">'
+                : '<div class="friend-result-avatar profile-avatar-fallback">' + (f.name ? f.name[0] : '?') + '</div>';
+
+            return '<div class="friend-result-item">' + avatarHtml +
+                '<span class="friend-result-name">' + escapeHtml(f.name) + '</span>' +
+                '<button class="friend-msg-btn" onclick="switchToFriendFromModal(' + f.id + ')">Yozish</button>' +
+                '<button class="friend-remove-btn" onclick="removeFriend(' + f.id + ', this)" aria-label="Dostlikdan chiqarish">✕</button>' +
+                '</div>';
+        }).join('');
     } catch (e) {
         console.error(e);
+    }
+}
+
+function switchToFriendFromModal(friendId) {
+    const f = cachedFriendsList.find(function (x) { return x.id === friendId; });
+    if (!f) return;
+    switchToFriend(f.id, f.name, f.avatar);
+    closeFriendsModal();
+}
+
+async function removeFriend(friendId, btnEl) {
+    if (!confirm("Bu foydalanuvchini dostlar royxatidan ochirishni tasdiqlaysizmi?")) return;
+    btnEl.disabled = true;
+
+    try {
+        const res = await fetch('/api/friends/' + friendId, { method: 'DELETE' });
+        const data = await res.json();
+
+        if (data.success) {
+            loadFriendsListModal();
+            if (getActiveChatId() === ('friend_' + friendId)) {
+                switchToPublic();
+            }
+        } else {
+            btnEl.disabled = false;
+        }
+    } catch (e) {
+        console.error(e);
+        btnEl.disabled = false;
     }
 }
 
@@ -513,7 +667,6 @@ async function switchToFriend(friendId, friendName, friendAvatar) {
     setActiveChatId('friend_' + friendId);
     chatHeaderTitle.textContent = '👤 ' + friendName;
     document.getElementById('public-chat-item').classList.remove('active');
-    loadFriendsList();
     closeSidebar();
 
     messagesBox.innerHTML = '<div class="empty-state"><p>Yuklanmoqda...</p></div>';
@@ -527,7 +680,7 @@ async function switchToFriend(friendId, friendName, friendAvatar) {
         lastRenderedKey = null;
 
         if (msgs.length === 0) {
-            messagesBox.innerHTML = '<div class="empty-state"><h2>' + escapeHtml(friendName) + '</h2><p>Hali xabar yoq, birinchi bolib yozing 👋</p></div>';
+            messagesBox.innerHTML = '<div class="empty-state"><h2>' + escapeHtml(friendName) + '</h2><p>Hali xabar yoq, birinchi bolib yozing 👋<br><span class="ai-hint">Suhbatga AI ni chaqirish uchun xabaringizga @AI deb yozing</span></p></div>';
             return;
         }
 
@@ -554,15 +707,20 @@ socket.on('friend_message', function (data) {
     const activeId = getActiveChatId();
     const otherUserId = (activeId.indexOf('friend_') === 0) ? parseInt(activeId.replace('friend_', ''), 10) : null;
 
-    if (otherUserId === data.from_user_id || otherUserId === data.to_user_id) {
+    const belongsToConversation = (otherUserId === data.from_user_id || otherUserId === data.to_user_id);
+
+    if (belongsToConversation) {
         clearEmptyState();
         appendMessageToDOM({
             username: data.sender_name,
             message: data.message,
             avatar: data.sender_avatar,
-            isAI: false
+            isAI: !!data.isAI,
+            prompt: data.prompt
         }, true);
         messagesBox.scrollTop = messagesBox.scrollHeight;
+    } else if (!data.isAI && data.sender_name) {
+        showNotificationToast(data.sender_name + ': ' + data.message.slice(0, 60));
     }
 });
 
@@ -787,7 +945,7 @@ window.addEventListener('DOMContentLoaded', function() {
         });
     } else {
         loadFriendRequests();
-        loadFriendsList();
-        setInterval(loadFriendRequests, 15000);
+        // Push orqali real-vaqt bildirishnomalar keladi; bu faqat zaxira uchun
+        setInterval(loadFriendRequests, 60000);
     }
 });

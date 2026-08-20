@@ -27,10 +27,11 @@ logger = logging.getLogger("notfic")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SECRET_KEY = os.getenv("SECRET_KEY", "notfic_secret_key_123")
-AI_MODEL = os.getenv("AI_MODEL", "llama-3.3-70b-versatile")
+AI_MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-20b")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "notfic_admin_2026")
 ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or "").strip().lower()
 AI_NAME = "Notfic AI ⚡"
+AI_TRIGGER = "@ai"
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
@@ -110,6 +111,27 @@ class DirectMessage(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class AIFeedback(db.Model):
+    __tablename__ = 'ai_feedback'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    prompt = db.Column(db.Text)
+    response = db.Column(db.Text)
+    rating = db.Column(db.Integer)  # 1 = yoqdi, -1 = yoqmadi
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class UserAIPreference(db.Model):
+    __tablename__ = 'user_ai_preferences'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    likes_count = db.Column(db.Integer, default=0)
+    dislikes_count = db.Column(db.Integer, default=0)
+    avg_liked_length = db.Column(db.Float, default=0.0)
+    avg_disliked_length = db.Column(db.Float, default=0.0)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 with app.app_context():
     db.create_all()
 
@@ -127,14 +149,43 @@ public_msg_counter = itertools.count(1)
 anonymous_message_counts = {}
 
 
-def get_ai_response(prompt: str, context=None) -> str:
+def get_user_ai_style_notes(user):
+    """Foydalanuvchining reyting tarixi asosida AI uslubini moslashtirish uchun qisqa yordamchi matn hosil qiladi."""
+    if not user:
+        return ""
+
+    pref = UserAIPreference.query.filter_by(user_id=user.id).first()
+    if not pref or (pref.likes_count + pref.dislikes_count) < 3:
+        return ""
+
+    notes = []
+    if pref.avg_liked_length and pref.avg_disliked_length:
+        if pref.avg_liked_length < pref.avg_disliked_length * 0.7:
+            notes.append("Bu foydalanuvchi qisqa va lo'nda javoblarni afzal koradi.")
+        elif pref.avg_liked_length > pref.avg_disliked_length * 1.3:
+            notes.append("Bu foydalanuvchi batafsil va toliq javoblarni afzal koradi.")
+
+    if not notes:
+        return ""
+
+    return "Foydalanuvchi haqida: " + " ".join(notes)
+
+
+def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None) -> str:
     if not ai_client:
         return f"🤖 [{AI_NAME}]: Hozircha AI ulanmagan — server tomonida API kalit sozlanmagan."
 
     if not prompt or not prompt.strip():
         return f"🤖 [{AI_NAME}]: Savolingizni yozing, men yordam berishga tayyorman!"
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    style_notes = get_user_ai_style_notes(user)
+    system_content = SYSTEM_PROMPT
+    if style_notes:
+        system_content += " " + style_notes
+    if extra_system_note:
+        system_content += " " + extra_system_note
+
+    messages = [{"role": "system", "content": system_content}]
 
     if context:
         for item in context[-14:]:
@@ -163,7 +214,7 @@ def current_user():
     user_id = session.get('user_id')
     if not user_id:
         return None
-    return User.query.get(user_id)
+    return db.session.get(User, user_id)
 
 
 def get_display_avatar(user):
@@ -212,6 +263,16 @@ def are_friends(user_id_a, user_id_b):
         ),
         FriendRequest.status == 'accepted'
     ).first() is not None
+
+
+def get_friendship_row(user_id_a, user_id_b):
+    return FriendRequest.query.filter(
+        db.or_(
+            db.and_(FriendRequest.sender_id == user_id_a, FriendRequest.receiver_id == user_id_b),
+            db.and_(FriendRequest.sender_id == user_id_b, FriendRequest.receiver_id == user_id_a)
+        ),
+        FriendRequest.status == 'accepted'
+    ).first()
 
 
 @app.route('/')
@@ -404,7 +465,7 @@ def api_friend_request():
     if not to_id or int(to_id) == user.id:
         return jsonify({"error": "invalid_target"}), 400
 
-    target = User.query.get(to_id)
+    target = db.session.get(User, to_id)
     if not target:
         return jsonify({"error": "not_found"}), 404
 
@@ -425,6 +486,13 @@ def api_friend_request():
 
     logger.info(f"Dostlik taklifi: {user.name} -> {target.name}")
 
+    socketio.emit('friend_request_received', {
+        "request_id": req.id,
+        "user_id": user.id,
+        "name": user.name,
+        "avatar": get_display_avatar(user)
+    }, room=str(to_id))
+
     return jsonify({"success": True})
 
 
@@ -436,7 +504,7 @@ def api_friend_requests():
 
     output = []
     for r in requests_in:
-        sender = User.query.get(r.sender_id)
+        sender = db.session.get(User, r.sender_id)
         if not sender:
             continue
         output.append({
@@ -456,12 +524,17 @@ def api_friend_respond(req_id):
     data = request.get_json() or {}
     action = data.get('action')
 
-    req = FriendRequest.query.get(req_id)
+    req = db.session.get(FriendRequest, req_id)
     if not req or req.receiver_id != user.id:
         return jsonify({"error": "not_found"}), 404
 
     if action == 'accept':
         req.status = 'accepted'
+        socketio.emit('friend_request_accepted', {
+            "user_id": user.id,
+            "name": user.name,
+            "avatar": get_display_avatar(user)
+        }, room=str(req.sender_id))
     elif action == 'reject':
         req.status = 'rejected'
     else:
@@ -483,7 +556,7 @@ def api_friends_list():
     output = []
     for r in accepted:
         other_id = r.receiver_id if r.sender_id == user.id else r.sender_id
-        other = User.query.get(other_id)
+        other = db.session.get(User, other_id)
         if not other:
             continue
         output.append({
@@ -495,6 +568,25 @@ def api_friends_list():
     return jsonify(output)
 
 
+@app.route('/api/friends/<int:friend_id>', methods=['DELETE'])
+@login_required_api
+def api_remove_friend(friend_id):
+    user = current_user()
+    req = get_friendship_row(user.id, friend_id)
+
+    if not req:
+        return jsonify({"error": "not_friends"}), 404
+
+    db.session.delete(req)
+    db.session.commit()
+
+    logger.info(f"Dostlikdan chiqarish: {user.name} -x- user#{friend_id}")
+
+    socketio.emit('friend_removed', {"user_id": user.id}, room=str(friend_id))
+
+    return jsonify({"success": True})
+
+
 @app.route('/api/friends/<int:friend_id>/messages')
 @login_required_api
 def api_friend_messages(friend_id):
@@ -503,7 +595,7 @@ def api_friend_messages(friend_id):
     if not are_friends(user.id, friend_id):
         return jsonify({"error": "not_friends"}), 403
 
-    friend = User.query.get(friend_id)
+    friend = db.session.get(User, friend_id)
 
     msgs = DirectMessage.query.filter(
         db.or_(
@@ -520,6 +612,40 @@ def api_friend_messages(friend_id):
         "avatar": get_display_avatar(user) if m.sender_id == user.id else get_display_avatar(friend),
         "time": m.created_at.strftime("%H:%M")
     } for m in msgs])
+
+
+@app.route('/api/ai/feedback', methods=['POST'])
+def api_ai_feedback():
+    user = current_user()
+    data = request.get_json() or {}
+    prompt = (data.get('prompt') or '').strip()[:2000]
+    response_text = (data.get('response') or '').strip()[:4000]
+    rating = data.get('rating')
+
+    if rating not in (1, -1):
+        return jsonify({"error": "invalid_rating"}), 400
+
+    fb = AIFeedback(user_id=user.id if user else None, prompt=prompt, response=response_text, rating=rating)
+    db.session.add(fb)
+
+    if user:
+        pref = UserAIPreference.query.filter_by(user_id=user.id).first()
+        if not pref:
+            pref = UserAIPreference(user_id=user.id)
+            db.session.add(pref)
+
+        length = len(response_text)
+        if rating == 1:
+            pref.avg_liked_length = ((pref.avg_liked_length * pref.likes_count) + length) / (pref.likes_count + 1)
+            pref.likes_count += 1
+        else:
+            pref.avg_disliked_length = ((pref.avg_disliked_length * pref.dislikes_count) + length) / (pref.dislikes_count + 1)
+            pref.dislikes_count += 1
+
+        pref.updated_at = datetime.utcnow()
+
+    db.session.commit()
+    return jsonify({"success": True})
 
 
 @app.route('/admin/login', methods=['GET', 'POST'])
@@ -582,6 +708,64 @@ def admin_api_stats():
     })
 
 
+@app.route('/admin/api/ai-stats')
+@admin_required
+def admin_ai_stats():
+    total_likes = AIFeedback.query.filter_by(rating=1).count()
+    total_dislikes = AIFeedback.query.filter_by(rating=-1).count()
+    total = total_likes + total_dislikes
+    satisfaction = round((total_likes / total) * 100, 1) if total else None
+    personalized_users = UserAIPreference.query.filter(
+        (UserAIPreference.likes_count + UserAIPreference.dislikes_count) >= 3
+    ).count()
+
+    return jsonify({
+        "total_likes": total_likes,
+        "total_dislikes": total_dislikes,
+        "satisfaction_percent": satisfaction,
+        "personalized_users": personalized_users
+    })
+
+
+@app.route('/admin/api/friends-overview')
+@admin_required
+def admin_friends_overview():
+    total_friendships = FriendRequest.query.filter_by(status='accepted').count()
+    pending_requests = FriendRequest.query.filter_by(status='pending').count()
+
+    return jsonify({
+        "total_friendships": total_friendships,
+        "pending_requests": pending_requests
+    })
+
+
+@app.route('/admin/api/broadcast', methods=['POST'])
+@admin_required
+def admin_broadcast():
+    data = request.get_json() or {}
+    text = (data.get('message') or '').strip()[:500]
+
+    if not text:
+        return jsonify({"error": "empty_message"}), 400
+
+    stats["total_public_messages"] += 1
+    msg_id = next(public_msg_counter)
+    entry = {
+        "id": msg_id,
+        "username": "📢 Notfic E'lon",
+        "message": text,
+        "avatar": None,
+        "time": datetime.utcnow().strftime("%H:%M:%S")
+    }
+    public_history.append(entry)
+
+    socketio.emit('public_response_message', entry)
+
+    logger.info(f"Admin elon yubordi: {text}")
+
+    return jsonify({"success": True})
+
+
 @app.route('/admin/api/users')
 @admin_required
 def admin_api_users():
@@ -604,7 +788,7 @@ def admin_api_users():
 @app.route('/admin/api/users/<int:user_id>/ban', methods=['POST'])
 @admin_required
 def admin_toggle_ban(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "not_found"}), 404
 
@@ -697,9 +881,10 @@ def handle_ai_message(data):
     emit('ai_response_message', {'username': username, 'message': msg, 'isAI': False, 'clientId': client_id})
 
     emit('ai_typing', {'typing': True})
-    ai_reply = get_ai_response(msg, context)
+    user = current_user()
+    ai_reply = get_ai_response(msg, context, user=user)
     emit('ai_typing', {'typing': False})
-    emit('ai_response_message', {'username': AI_NAME, 'message': ai_reply, 'isAI': True})
+    emit('ai_response_message', {'username': AI_NAME, 'message': ai_reply, 'isAI': True, 'prompt': msg})
 
 
 @socketio.on('public_message')
@@ -781,6 +966,31 @@ def handle_friend_message(data):
 
     emit('friend_message', payload, room=str(to_id))
     emit('friend_message', payload, room=str(user.id))
+
+    # Agar @AI deb chaqirilsa, AI shu dostlar suhbatiga uchinchi ishtirokchi sifatida qoshiladi
+    if AI_TRIGGER in msg.lower():
+        friend = db.session.get(User, to_id)
+        note = (
+            "Siz hozir ikki do'st (" + (user.name or 'Foydalanuvchi') + " va " +
+            (friend.name if friend else 'dostlari') +
+            ") orasidagi shaxsiy suhbatga uchinchi ishtirokchi sifatida qoshildingiz. "
+            "Ular sizni @AI deb chaqirishdi. Do'stona, tabiiy ohangda, suhbat kontekstiga mos qisqa javob bering."
+        )
+        ai_reply = get_ai_response(msg, user=user, extra_system_note=note)
+
+        ai_payload = {
+            "id": None,
+            "from_user_id": user.id,
+            "to_user_id": int(to_id),
+            "message": ai_reply,
+            "sender_name": AI_NAME,
+            "sender_avatar": None,
+            "time": datetime.utcnow().strftime("%H:%M"),
+            "isAI": True,
+            "prompt": msg
+        }
+        emit('friend_message', ai_payload, room=str(to_id))
+        emit('friend_message', ai_payload, room=str(user.id))
 
 
 if __name__ == '__main__':
