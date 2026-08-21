@@ -2,278 +2,359 @@
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Notfic</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel — Notfic</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/admin.css">
 </head>
-<body data-logged-in="{{ 'true' if user else 'false' }}" data-anon-limit="{{ anon_limit }}">
+<body>
 
-    <div class="app">
+    <div class="admin-app">
 
-        <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
-
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-brand">
+        <header class="admin-header">
+            <div class="admin-brand">
                 <span class="dot"></span>
-                <span>Notfic</span>
+                <span>Notfic Admin Panel</span>
+            </div>
+            <a href="{{ url_for('admin_logout') }}" class="logout-btn">Chiqish</a>
+        </header>
+
+        <main class="admin-main">
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">🟢 Hozir onlayn</span>
+                    <span class="stat-value" id="stat-online">{{ online_count }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">👥 Jami foydalanuvchilar</span>
+                    <span class="stat-value" id="stat-users">{{ total_users }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">💬 Ochiq suhbat xabarlari</span>
+                    <span class="stat-value" id="stat-public">{{ total_public }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">🤖 AI suhbatlari</span>
+                    <span class="stat-value" id="stat-ai">{{ total_ai }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">⏱ Server ishlab turgan vaqt</span>
+                    <span class="stat-value stat-value-sm" id="stat-uptime">{{ uptime }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">⚡ AI holati</span>
+                    <span class="stat-value stat-value-sm">
+                        {% if ai_connected %}
+                            <span class="status-ok">Ulangan</span>
+                        {% else %}
+                            <span class="status-error">Ulanmagan</span>
+                        {% endif %}
+                    </span>
+                </div>
             </div>
 
-            <div id="public-chat-item" class="chat-item pinned" onclick="switchToPublic()">
-                💬 Ochiq Suhbat
+            <div class="stats-grid stats-grid-secondary">
+                <div class="stat-card">
+                    <span class="stat-label">👍 AI qoniqish darajasi</span>
+                    <span class="stat-value stat-value-sm" id="stat-ai-satisfaction">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">🎯 Shaxsiylashtirilgan foydalanuvchilar</span>
+                    <span class="stat-value stat-value-sm" id="stat-personalized-users">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">🤝 Jami dostliklar</span>
+                    <span class="stat-value stat-value-sm" id="stat-friendships">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">⏳ Kutilayotgan sorovlar</span>
+                    <span class="stat-value stat-value-sm" id="stat-pending-requests">—</span>
+                </div>
             </div>
 
-            <button class="new-chat-btn" onclick="newAIChat()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Yangi AI suhbat
-            </button>
+            <section class="history-section">
+                <h2>📢 Ommaviy e'lon yuborish</h2>
+                <p class="section-hint">Bu xabar barcha foydalanuvchilarga Ochiq Suhbatda darhol korinadi.</p>
+                <div class="broadcast-form">
+                    <input type="text" id="broadcast-input" class="user-search-input" placeholder="E'lon matnini yozing..." maxlength="500">
+                    <button class="broadcast-btn" onclick="sendBroadcast()">Yuborish</button>
+                </div>
+                <span id="broadcast-status" class="profile-save-status"></span>
+            </section>
 
-            <nav class="sidebar-section">
-                <span class="sidebar-label chat-list-label">
-                    <span>🤖 AI bilan suhbatlarim</span>
-                    <button class="chat-list-toggle-arrow" id="chat-list-toggle-btn" onclick="toggleChatListExpand()" aria-label="Kop suhbatlarni korsatish" style="display:none">
-                        <svg class="chevron-icon" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                </span>
-                <div id="chat-list" class="chat-list"></div>
-            </nav>
+            <section class="history-section">
+                <div class="section-header-row">
+                    <h2>Foydalanuvchilar</h2>
+                    <button class="danger-btn danger-btn-outline" onclick="exportUsers()">⬇ Eksport (JSON)</button>
+                </div>
+                <input type="text" id="user-search" class="user-search-input" placeholder="Ism yoki email boyicha qidirish..." oninput="loadUsers()">
+                <div class="user-list" id="user-list"></div>
+            </section>
 
-            <button class="new-chat-btn" onclick="openAppsModal()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>
-                Ilovalar
-            </button>
-
-            {% if user %}
-            <button class="new-chat-btn" onclick="openFriendsModal()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Do'stlar
-                <span id="friend-request-badge" class="sidebar-badge" style="display:none"></span>
-            </button>
-            {% endif %}
-
-            <div class="sidebar-footer">
-
-                {% if user %}
-                <div class="profile-card" onclick="openProfile()">
-                    {% if display_avatar %}
-                    <img src="{{ display_avatar }}" class="profile-avatar" id="sidebar-avatar-img" alt="avatar">
-                    {% else %}
-                    <div class="profile-avatar profile-avatar-fallback" id="sidebar-avatar-img">{{ user.name[0] if user.name else '?' }}</div>
-                    {% endif %}
-                    <div class="profile-info">
-                        <span class="profile-name">{{ user.name }}</span>
-                        <span class="profile-view">Profilni korish</span>
+            <section class="history-section">
+                <h2>So'nggi Ochiq Suhbat xabarlari</h2>
+                <div class="history-list" id="history-list">
+                    {% for h in history %}
+                    <div class="history-item">
+                        <span class="history-time">{{ h.time }}</span>
+                        <strong>{{ h.username }}:</strong> {{ h.message }}
+                        <button class="delete-msg-btn" data-id="{{ h.id }}" onclick="deleteMessage(this.dataset.id)">
+                            O'chirish
+                        </button>
                     </div>
-                </div>
-                {% else %}
-                <a href="/auth/google/login" class="google-login-btn">
-                    <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l6-6C34.5 5.5 29.5 3.5 24 3.5 12.7 3.5 3.5 12.7 3.5 24S12.7 44.5 24 44.5 44.5 35.3 44.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3 0 5.8 1.1 7.9 3l6-6C34.5 5.5 29.5 3.5 24 3.5c-7.6 0-14.1 4.3-17.4 10.6z"/><path fill="#4CAF50" d="M24 44.5c5.4 0 10.3-1.9 14-5.1l-6.5-5.4c-2 1.4-4.6 2.3-7.5 2.3-5.3 0-9.7-3.4-11.3-8.1l-6.6 5.1C9.8 40.1 16.4 44.5 24 44.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.5 5.4C41.4 35.5 44.5 30.3 44.5 24c0-1.2-.1-2.4-.3-3.5z"/></svg>
-                    Google orqali kirish
-                </a>
-                {% endif %}
-
-                <input type="text" id="username" placeholder="Ismingiz" class="username-input" {% if user %}style="display:none"{% endif %}>
-
-                {% if is_admin %}
-                <a href="/admin" class="settings-btn admin-link">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" stroke="currentColor" stroke-width="1.6"/></svg>
-                    Boshqarish paneli
-                </a>
-                {% endif %}
-
-                <button class="settings-btn" onclick="openSettings()">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 8a4 4 0 100 8 4 4 0 000-8z" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 13a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-1.8-.3 1.6 1.6 0 00-1 1.5V19a2 2 0 11-4 0v-.1a1.6 1.6 0 00-1-1.5 1.6 1.6 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00.3-1.8 1.6 1.6 0 00-1.5-1H4a2 2 0 110-4h.1a1.6 1.6 0 001.5-1 1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H10a1.6 1.6 0 001-1.5V4a2 2 0 114 0v.1a1.6 1.6 0 001 1.5 1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V10a1.6 1.6 0 001.5 1H20a2 2 0 110 4h-.1a1.6 1.6 0 00-1.5 1z" stroke="currentColor" stroke-width="1.6"/></svg>
-                    Sozlamalar
-                </button>
-            </div>
-        </aside>
-
-        <main class="main">
-            <div class="chat-header">
-                <button class="hamburger-btn" onclick="openSidebar()" aria-label="Menyu">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                </button>
-                <span id="chat-header-title">💬 Ochiq Suhbat</span>
-                <span id="anon-limit-badge" class="anon-limit-badge" style="display:none"></span>
-            </div>
-
-            <div id="messages-box" class="messages-box"></div>
-
-            <footer class="input-row">
-                <div class="input-shell">
-                    <input type="text" id="message-input" placeholder="Xabaringizni yozing..." onkeypress="if(event.key==='Enter') sendMessage()">
-                    <button onclick="sendMessage()" class="send-btn" aria-label="Yuborish">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M4 12L20 4L14 20L11 13L4 12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
-                </div>
-            </footer>
-        </main>
-
-    </div>
-
-    <!-- SOZLAMALAR MODAL -->
-    <div id="settings-modal" class="modal-overlay" onclick="if(event.target===this) closeSettings()">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Sozlamalar</h3>
-                <button class="modal-close" onclick="closeSettings()">X</button>
-            </div>
-            <div class="modal-row">
-                <span>Mavzu</span>
-                <button class="theme-toggle" onclick="toggleTheme()">
-                    <span id="theme-label">Och rang</span>
-                </button>
-            </div>
-            {% if user %}
-            <div class="modal-row">
-                <span>Hisob</span>
-                <a href="/auth/logout" class="logout-link">Chiqish</a>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- PROFIL MODAL -->
-    {% if user %}
-    <div id="profile-modal" class="modal-overlay" onclick="if(event.target===this) closeProfile()">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Mening profilim</h3>
-                <button class="modal-close" onclick="closeProfile()">X</button>
-            </div>
-
-            <div class="profile-modal-header">
-                <div class="avatar-upload-wrap">
-                    {% if display_avatar %}
-                    <img src="{{ display_avatar }}" class="profile-modal-avatar" id="profile-avatar-img" alt="avatar">
                     {% else %}
-                    <div class="profile-modal-avatar profile-avatar-fallback" id="profile-avatar-img">{{ user.name[0] if user.name else '?' }}</div>
-                    {% endif %}
-                    <button class="avatar-edit-btn" onclick="document.getElementById('avatar-file-input').click()" aria-label="Rasmni ozgartirish">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <input type="file" id="avatar-file-input" accept="image/png, image/jpeg, image/webp" style="display:none" onchange="uploadAvatar(this)">
+                    <div class="history-empty">Hali xabar yo'q</div>
+                    {% endfor %}
                 </div>
-                <span class="profile-modal-email">{{ user.email }}</span>
-                {% if user.custom_avatar %}
-                <button class="avatar-remove-btn" onclick="removeAvatar()">Odatiy rasmga qaytarish</button>
-                {% endif %}
-                <span id="avatar-upload-status" class="profile-save-status"></span>
-            </div>
+            </section>
 
-            <label class="profile-field-label">Ism</label>
-            <input type="text" id="profile-name-input" value="{{ user.name }}" class="profile-field-input" maxlength="100">
+            <section class="history-section">
+                <h2>🛡 Audit jurnali</h2>
+                <p class="section-hint">Barcha admin amallarining xavfsizlik yozuvlari — kim, qachon, nima qildi.</p>
+                <div class="history-list" id="audit-log-list"></div>
+            </section>
 
-            <label class="profile-field-label">Bio</label>
-            <textarea id="profile-bio-input" class="profile-field-textarea" maxlength="300" placeholder="Ozingiz haqingizda qisqacha...">{{ user.bio or '' }}</textarea>
-
-            <button class="profile-save-btn" onclick="saveProfile()">Saqlash</button>
-            <span id="profile-save-status" class="profile-save-status"></span>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- LOGIN TALAB QILINADI MODAL -->
-    <div id="login-required-modal" class="modal-overlay" onclick="if(event.target===this) closeLoginRequired()">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Bepul xabarlar tugadi</h3>
-                <button class="modal-close" onclick="closeLoginRequired()">X</button>
-            </div>
-            <p class="login-required-text">Anonim rejimda cheklangan xabar yubordingiz. Suhbatni davom ettirish uchun Google orqali kiring — bu bepul va bir necha soniya oladi.</p>
-            <a href="/auth/google/login" class="google-login-btn google-login-btn-modal">
-                <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l6-6C34.5 5.5 29.5 3.5 24 3.5 12.7 3.5 3.5 12.7 3.5 24S12.7 44.5 24 44.5 44.5 35.3 44.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3 0 5.8 1.1 7.9 3l6-6C34.5 5.5 29.5 3.5 24 3.5c-7.6 0-14.1 4.3-17.4 10.6z"/><path fill="#4CAF50" d="M24 44.5c5.4 0 10.3-1.9 14-5.1l-6.5-5.4c-2 1.4-4.6 2.3-7.5 2.3-5.3 0-9.7-3.4-11.3-8.1l-6.6 5.1C9.8 40.1 16.4 44.5 24 44.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.5 5.4C41.4 35.5 44.5 30.3 44.5 24c0-1.2-.1-2.4-.3-3.5z"/></svg>
-                Google orqali kirish
-            </a>
-        </div>
+        </main>
     </div>
 
-    <!-- DO'STLAR MODALI (yagona bolim: sorovlar + royxat + qidirish/taklif) -->
-    {% if user %}
-    <div id="friends-modal" class="modal-overlay" onclick="if(event.target===this) closeFriendsModal()">
-        <div class="modal friends-modal-box">
-            <div class="modal-header">
-                <h3>👥 Do'stlar</h3>
-                <button class="modal-close" onclick="closeFriendsModal()">X</button>
-            </div>
+    <script>
+        function askAdminPassword(actionLabel) {
+            return prompt('Xavfli amal: "' + actionLabel + '".\nDavom etish uchun admin parolini qayta kiriting:');
+        }
 
-            <div id="friend-requests-list"></div>
+        async function refreshStats() {
+            try {
+                const res = await fetch('/admin/api/stats');
+                if (!res.ok) return;
+                const data = await res.json();
 
-            <div class="friends-section-title">Mening do'stlarim</div>
-            <div id="friends-list-modal" class="friend-results"></div>
+                document.getElementById('stat-online').textContent = data.online_count;
+                document.getElementById('stat-public').textContent = data.total_public;
+                document.getElementById('stat-ai').textContent = data.total_ai;
+                document.getElementById('stat-users').textContent = data.total_users;
+                document.getElementById('stat-uptime').textContent = data.uptime;
 
-            <div class="friends-section-title">Yangi do'st qidirish</div>
-            <input type="text" id="friend-search-input" class="profile-field-input" placeholder="Ism boyicha qidirish..." oninput="searchFriends()">
-            <div id="friend-search-results" class="friend-results"></div>
-        </div>
-    </div>
-    {% endif %}
+                const list = document.getElementById('history-list');
+                if (data.history.length === 0) {
+                    list.innerHTML = '<div class="history-empty">Hali xabar yoq</div>';
+                } else {
+                    list.innerHTML = data.history.map(function(h) {
+                        return '<div class="history-item"><span class="history-time">' + h.time + '</span><strong>' + h.username + ':</strong> ' + h.message + ' <button class="delete-msg-btn" onclick="deleteMessage(' + h.id + ')">O\'chirish</button></div>';
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Statistikani yangilashda xato:', e);
+            }
+        }
 
-    <!-- ILOVALAR MODAL -->
-    <div id="apps-modal" class="modal-overlay" onclick="if(event.target===this) closeAppsModal()">
-        <div class="modal apps-modal-box">
-            <div class="modal-header">
-                <h3>Ilovalar</h3>
-                <button class="modal-close" onclick="closeAppsModal()">X</button>
-            </div>
-            <div class="apps-grid">
-                <a href="https://www.google.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#4285F4">🔍</div>
-                    <span>Google</span>
-                </a>
-                <a href="https://www.youtube.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#FF0000">▶️</div>
-                    <span>YouTube</span>
-                </a>
-                <a href="https://mail.google.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#EA4335">✉️</div>
-                    <span>Gmail</span>
-                </a>
-                <a href="https://www.instagram.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:linear-gradient(45deg,#F58529,#DD2A7B,#8134AF)">📷</div>
-                    <span>Instagram</span>
-                </a>
-                <a href="https://telegram.org" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#26A5E4">✈️</div>
-                    <span>Telegram</span>
-                </a>
-                <a href="https://web.whatsapp.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#25D366">💬</div>
-                    <span>WhatsApp</span>
-                </a>
-                <a href="https://www.facebook.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#1877F2">👥</div>
-                    <span>Facebook</span>
-                </a>
-                <a href="https://twitter.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#000000">𝕏</div>
-                    <span>X (Twitter)</span>
-                </a>
-                <a href="https://www.netflix.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#E50914">🎬</div>
-                    <span>Netflix</span>
-                </a>
-                <a href="https://open.spotify.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#1DB954">🎵</div>
-                    <span>Spotify</span>
-                </a>
-                <a href="https://maps.google.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#34A853">🗺️</div>
-                    <span>Maps</span>
-                </a>
-                <a href="https://drive.google.com" target="_blank" rel="noopener" class="app-tile">
-                    <div class="app-icon" style="background:#FFC107">📁</div>
-                    <span>Drive</span>
-                </a>
-            </div>
-        </div>
-    </div>
+        async function loadAIStats() {
+            try {
+                const res = await fetch('/admin/api/ai-stats');
+                const data = await res.json();
+                document.getElementById('stat-ai-satisfaction').textContent =
+                    data.satisfaction_percent === null ? "Hali baholanmagan" : data.satisfaction_percent + '% (' + data.total_likes + ' 👍 / ' + data.total_dislikes + ' 👎)';
+                document.getElementById('stat-personalized-users').textContent = data.personalized_users;
+            } catch (e) {
+                console.error(e);
+            }
+        }
 
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="/static/script.js"></script>
+        async function loadFriendsOverview() {
+            try {
+                const res = await fetch('/admin/api/friends-overview');
+                const data = await res.json();
+                document.getElementById('stat-friendships').textContent = data.total_friendships;
+                document.getElementById('stat-pending-requests').textContent = data.pending_requests;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function sendBroadcast() {
+            const input = document.getElementById('broadcast-input');
+            const statusEl = document.getElementById('broadcast-status');
+            const text = input.value.trim();
+            if (!text) return;
+
+            statusEl.textContent = 'Yuborilmoqda...';
+            try {
+                const res = await fetch('/admin/api/broadcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    statusEl.textContent = 'Yuborildi ✓';
+                    input.value = '';
+                    loadAuditLog();
+                    setTimeout(function () { statusEl.textContent = ''; }, 2000);
+                } else {
+                    statusEl.textContent = 'Xato yuz berdi';
+                }
+            } catch (e) {
+                statusEl.textContent = 'Xato yuz berdi';
+            }
+        }
+
+        async function loadUsers() {
+            const search = document.getElementById('user-search').value;
+            try {
+                const res = await fetch('/admin/api/users?q=' + encodeURIComponent(search));
+                const users = await res.json();
+                const list = document.getElementById('user-list');
+
+                if (users.length === 0) {
+                    list.innerHTML = '<div class="history-empty">Foydalanuvchi topilmadi</div>';
+                    return;
+                }
+
+                list.innerHTML = users.map(function (u) {
+                    const safeName = u.name.replace(/'/g, "\\'");
+                    let actionsHtml = '';
+                    if (!u.is_admin) {
+                        actionsHtml =
+                            '<button class="ban-btn ' + (u.is_banned ? 'banned' : '') + '" onclick="toggleBan(' + u.id + ')">' + (u.is_banned ? 'Blokdan chiqarish' : 'Bloklash') + '</button>' +
+                            '<button class="msg-view-btn" onclick="viewUserMessages(' + u.id + ', \'' + safeName + '\')">Xabarlar</button>' +
+                            '<button class="danger-btn" onclick="deleteUser(' + u.id + ', \'' + safeName + '\')">Ochirish</button>';
+                    }
+                    return '<div class="user-item">' +
+                        '<span class="user-item-name">' + u.name + (u.is_admin ? ' 👑' : '') + '</span>' +
+                        '<span class="user-item-email">' + u.email + '</span>' +
+                        actionsHtml +
+                        '</div>';
+                }).join('');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function toggleBan(userId) {
+            try {
+                await fetch('/admin/api/users/' + userId + '/ban', { method: 'POST' });
+                loadUsers();
+                loadAuditLog();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function viewUserMessages(userId, userName) {
+            try {
+                const res = await fetch('/admin/api/users/' + userId + '/messages');
+                const msgs = await res.json();
+                loadAuditLog();
+
+                if (msgs.length === 0) {
+                    alert(userName + " uchun shaxsiy xabarlar topilmadi.");
+                    return;
+                }
+
+                const text = msgs.map(function (m) {
+                    return '[' + m.time + '] #' + m.sender_id + ' -> #' + m.receiver_id + ': ' + m.message;
+                }).join('\n');
+
+                alert(userName + " xabarlari (oxirgi 100 ta):\n\n" + text);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function deleteUser(userId, userName) {
+            if (!confirm(userName + " hisobini BUTUNLAY OCHIRISHNI tasdiqlaysizmi?\nBu amalni ORQAGA QAYTARIB BOLMAYDI.")) return;
+
+            const password = askAdminPassword("Foydalanuvchini ochirish: " + userName);
+            if (!password) return;
+
+            try {
+                const res = await fetch('/admin/api/users/' + userId + '/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirm_password: password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    loadUsers();
+                    loadAuditLog();
+                } else if (data.error === 'confirm_password_required') {
+                    alert('Parol notogri. Amal bekor qilindi.');
+                } else {
+                    alert('Xato: ' + (data.error || 'nomalum'));
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function exportUsers() {
+            const password = askAdminPassword("Foydalanuvchilar royxatini eksport qilish");
+            if (!password) return;
+
+            try {
+                const res = await fetch('/admin/api/export/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirm_password: password })
+                });
+                const data = await res.json();
+
+                if (Array.isArray(data)) {
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'notfic_users_export.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    loadAuditLog();
+                } else {
+                    alert('Parol notogri yoki xato yuz berdi.');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function deleteMessage(msgId) {
+            if (!confirm('Bu xabarni ochirishni tasdiqlaysizmi?')) return;
+            try {
+                await fetch('/admin/api/messages/' + msgId, { method: 'DELETE' });
+                refreshStats();
+                loadAuditLog();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadAuditLog() {
+            try {
+                const res = await fetch('/admin/api/audit-log');
+                const entries = await res.json();
+                const el = document.getElementById('audit-log-list');
+                if (!el) return;
+
+                if (entries.length === 0) {
+                    el.innerHTML = '<div class="history-empty">Hali yozuv yoq</div>';
+                    return;
+                }
+
+                el.innerHTML = entries.map(function (e) {
+                    return '<div class="history-item"><span class="history-time">' + e.time + '</span><strong>' + e.action + '</strong>' + (e.detail ? ' — ' + e.detail : '') + '</div>';
+                }).join('');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        loadUsers();
+        loadAIStats();
+        loadFriendsOverview();
+        loadAuditLog();
+        setInterval(refreshStats, 5000);
+        setInterval(loadAuditLog, 15000);
+    </script>
 
 </body>
 </html>

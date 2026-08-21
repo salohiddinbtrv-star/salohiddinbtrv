@@ -17,6 +17,7 @@ let isConnected = false;
 const sentMessageIds = new Set();
 let lastRenderedKey = null;
 let cachedFriendsList = [];
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢'];
 
 /* ---------- MOBIL BALANDLIK TUZATISH ---------- */
 function setViewportHeight() {
@@ -108,9 +109,12 @@ let chatListExpanded = false;
 function makeChatListItem(id, chats, activeId) {
     const chat = chats[id];
     const item = document.createElement('div');
-    item.className = 'chat-item' + (id === activeId ? ' active' : '');
-    item.textContent = chat.title;
-    item.onclick = (function (chatId) {
+    item.className = 'chat-item chat-item-deletable' + (id === activeId ? ' active' : '');
+
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'chat-item-title';
+    titleSpan.textContent = chat.title;
+    titleSpan.onclick = (function (chatId) {
         return function () {
             setActiveChatId(chatId);
             renderChatList();
@@ -119,7 +123,34 @@ function makeChatListItem(id, chats, activeId) {
             closeSidebar();
         };
     })(id);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'chat-item-delete-btn';
+    deleteBtn.setAttribute('aria-label', 'Suhbatni ochirish');
+    deleteBtn.innerHTML = '✕';
+    deleteBtn.onclick = (function (chatId) {
+        return function (event) {
+            event.stopPropagation();
+            deleteAIChat(chatId);
+        };
+    })(id);
+
+    item.appendChild(titleSpan);
+    item.appendChild(deleteBtn);
     return item;
+}
+
+function deleteAIChat(chatId) {
+    if (!confirm("Bu AI suhbatini ochirishni tasdiqlaysizmi?")) return;
+    const chats = loadChats();
+    delete chats[chatId];
+    saveChats(chats);
+
+    if (getActiveChatId() === chatId) {
+        switchToPublic();
+    } else {
+        renderChatList();
+    }
 }
 
 function renderChatList() {
@@ -251,6 +282,51 @@ async function sendAIFeedback(promptEnc, respEnc, rating, btnEl) {
     }
 }
 
+function currentChatKind() {
+    const activeId = getActiveChatId();
+    if (activeId === PUBLIC_ID) return 'public';
+    if (activeId.indexOf('friend_') === 0) return 'friend';
+    if (activeId.indexOf('group_') === 0) return 'group';
+    return 'ai';
+}
+
+function buildReactionHtml(data) {
+    const current = data.reaction || '';
+    const badge = current
+        ? '<span class="msg-reaction-badge" onclick="toggleReactionPicker(this)">' + current + '</span>'
+        : '<button class="reaction-add-btn" onclick="toggleReactionPicker(this)">🙂+</button>';
+    const options = REACTION_EMOJIS.map(function (e) {
+        return '<span class="reaction-option" onclick="pickReaction(this,\'' + e + '\')">' + e + '</span>';
+    }).join('');
+    return '<div class="msg-reaction-row">' + badge + '<div class="reaction-picker">' + options + '</div></div>';
+}
+
+function toggleReactionPicker(el) {
+    const row = el.closest('.msg-reaction-row');
+    document.querySelectorAll('.msg-reaction-row.open').forEach(function (r) {
+        if (r !== row) r.classList.remove('open');
+    });
+    row.classList.toggle('open');
+}
+
+function pickReaction(el, emoji) {
+    const msgRow = el.closest('.message-row');
+    const reactionRow = el.closest('.msg-reaction-row');
+    reactionRow.classList.remove('open');
+
+    const msgId = msgRow.getAttribute('data-msg-id');
+    const kind = msgRow.getAttribute('data-chat-kind');
+    if (!msgId) return;
+
+    if (kind === 'public') {
+        socket.emit('react_public', { msg_id: parseInt(msgId, 10), emoji: emoji });
+    } else if (kind === 'friend') {
+        const activeId = getActiveChatId();
+        const friendId = parseInt(activeId.replace('friend_', ''), 10);
+        socket.emit('react_friend', { msg_id: parseInt(msgId, 10), to_user_id: friendId, emoji: emoji });
+    }
+}
+
 function appendMessageToDOM(data, animate) {
     const groupKey = (data.isAI ? 'ai' : 'user') + '::' + data.username;
     const isGrouped = (groupKey === lastRenderedKey);
@@ -260,12 +336,14 @@ function appendMessageToDOM(data, animate) {
     row.className = 'message-row' + (data.isAI ? ' ai-row' : ' user-row') + (isGrouped ? ' grouped' : '');
     if (animate) row.classList.add('msg-enter');
     if (data.id) row.setAttribute('data-msg-id', data.id);
+    row.setAttribute('data-chat-kind', currentChatKind());
 
     const avatarHtml = isGrouped ? '<div class="msg-avatar-spacer"></div>' : avatarHtmlFor(data);
 
     const nameHtml = isGrouped ? '' : '<strong>' + escapeHtml(data.username) + '</strong>';
 
     const feedbackHtml = data.isAI ? buildFeedbackHtml(data) : '';
+    const reactionHtml = (!data.isAI && data.id) ? buildReactionHtml(data) : '';
 
     row.innerHTML =
         avatarHtml +
@@ -273,6 +351,7 @@ function appendMessageToDOM(data, animate) {
             nameHtml +
             '<div class="message">' + escapeHtml(data.message) + '</div>' +
             feedbackHtml +
+            reactionHtml +
         '</div>';
 
     messagesBox.appendChild(row);
@@ -379,11 +458,50 @@ socket.on('friend_request_accepted', function (data) {
     showNotificationToast(data.name + ' taklifingizni qabul qildi');
 });
 
+socket.on('force_logout', function (data) {
+    alert(data.reason === 'account_deleted'
+        ? "Hisobingiz administrator tomonidan ochirildi."
+        : "Hisobingiz bloklandi.");
+    window.location.href = '/auth/logout';
+});
+
 socket.on('friend_removed', function (data) {
     loadFriendsListModal();
     if (getActiveChatId() === ('friend_' + data.user_id)) {
         switchToPublic();
         showNotificationToast('Bu foydalanuvchi sizni dostlar royxatidan chiqardi');
+    }
+});
+
+socket.on('friend_online', function (data) {
+    const dot = document.getElementById('friend-dot-' + data.user_id);
+    if (dot) dot.classList.add('online');
+});
+
+socket.on('friend_offline', function (data) {
+    const dot = document.getElementById('friend-dot-' + data.user_id);
+    if (dot) dot.classList.remove('online');
+});
+
+socket.on('public_reaction_update', function (data) {
+    const row = messagesBox.querySelector('.message-row[data-msg-id="' + data.id + '"]');
+    if (row) {
+        const reactionRow = row.querySelector('.msg-reaction-row');
+        if (reactionRow) reactionRow.outerHTML = buildReactionHtml({ id: data.id, reaction: data.emoji });
+    }
+    const history = loadPublicHistory();
+    const item = history.find(function (m) { return m.id === data.id; });
+    if (item) {
+        item.reaction = data.emoji;
+        savePublicHistory(history);
+    }
+});
+
+socket.on('friend_reaction_update', function (data) {
+    const row = messagesBox.querySelector('.message-row[data-msg-id="' + data.id + '"]');
+    if (row) {
+        const reactionRow = row.querySelector('.msg-reaction-row');
+        if (reactionRow) reactionRow.outerHTML = buildReactionHtml({ id: data.id, reaction: data.emoji });
     }
 });
 
@@ -623,7 +741,8 @@ async function loadFriendsListModal() {
                 ? '<img src="' + f.avatar + '" class="friend-result-avatar" alt="">'
                 : '<div class="friend-result-avatar profile-avatar-fallback">' + (f.name ? f.name[0] : '?') + '</div>';
 
-            return '<div class="friend-result-item">' + avatarHtml +
+            return '<div class="friend-result-item">' +
+                '<span class="friend-avatar-wrap">' + avatarHtml + '<span class="friend-online-dot' + (f.is_online ? ' online' : '') + '" id="friend-dot-' + f.id + '"></span></span>' +
                 '<span class="friend-result-name">' + escapeHtml(f.name) + '</span>' +
                 '<button class="friend-msg-btn" onclick="switchToFriendFromModal(' + f.id + ')">Yozish</button>' +
                 '<button class="friend-remove-btn" onclick="removeFriend(' + f.id + ', this)" aria-label="Dostlikdan chiqarish">✕</button>' +
@@ -686,15 +805,228 @@ async function switchToFriend(friendId, friendName, friendAvatar) {
 
         msgs.forEach(function (m) {
             appendMessageToDOM({
+                id: m.id,
                 username: m.is_mine ? 'Siz' : friendName,
                 message: m.message,
                 avatar: m.avatar,
-                isAI: false
+                isAI: false,
+                reaction: m.reaction
             }, false);
         });
         messagesBox.scrollTop = messagesBox.scrollHeight;
     } catch (e) {
         console.error(e);
+    }
+}
+
+/* ---------- GURUH CHATLARI ---------- */
+let cachedGroupsList = [];
+let selectedGroupMemberIds = new Set();
+
+function openGroupsModal() {
+    document.getElementById('groups-modal').classList.add('open');
+    closeSidebar();
+    loadGroupsListModal();
+    renderGroupMemberPicker();
+}
+
+function closeGroupsModal() {
+    document.getElementById('groups-modal').classList.remove('open');
+    document.getElementById('group-name-input').value = '';
+    selectedGroupMemberIds.clear();
+}
+
+function renderGroupMemberPicker() {
+    const el = document.getElementById('group-member-picker');
+    if (!el) return;
+
+    if (cachedFriendsList.length === 0) {
+        el.innerHTML = '<div class="sidebar-empty">Guruh yaratish uchun avval dostlar qoshing</div>';
+        return;
+    }
+
+    el.innerHTML = cachedFriendsList.map(function (f) {
+        const avatarHtml = f.avatar
+            ? '<img src="' + f.avatar + '" class="friend-result-avatar" alt="">'
+            : '<div class="friend-result-avatar profile-avatar-fallback">' + (f.name ? f.name[0] : '?') + '</div>';
+
+        return '<label class="group-member-option">' +
+            '<input type="checkbox" onchange="toggleGroupMember(' + f.id + ', this.checked)">' +
+            avatarHtml +
+            '<span class="friend-result-name">' + escapeHtml(f.name) + '</span>' +
+            '</label>';
+    }).join('');
+}
+
+function toggleGroupMember(friendId, checked) {
+    if (checked) {
+        selectedGroupMemberIds.add(friendId);
+    } else {
+        selectedGroupMemberIds.delete(friendId);
+    }
+}
+
+async function createGroup() {
+    const nameInput = document.getElementById('group-name-input');
+    const statusEl = document.getElementById('group-create-status');
+    const name = nameInput.value.trim();
+
+    if (selectedGroupMemberIds.size === 0) {
+        statusEl.textContent = 'Kamida bitta dost tanlang';
+        return;
+    }
+
+    statusEl.textContent = 'Yaratilmoqda...';
+
+    try {
+        const res = await fetch('/api/groups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: name || 'Nomsiz guruh',
+                member_ids: Array.from(selectedGroupMemberIds)
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            statusEl.textContent = '';
+            nameInput.value = '';
+            selectedGroupMemberIds.clear();
+            renderGroupMemberPicker();
+            loadGroupsListModal();
+            switchToGroup(data.group_id, data.name);
+            closeGroupsModal();
+        } else {
+            statusEl.textContent = 'Xato yuz berdi';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Xato yuz berdi';
+    }
+}
+
+async function loadGroupsListModal() {
+    try {
+        const res = await fetch('/api/groups');
+        const groups = await res.json();
+        cachedGroupsList = groups;
+
+        const el = document.getElementById('groups-list-modal');
+        if (!el) return;
+
+        if (groups.length === 0) {
+            el.innerHTML = '<div class="sidebar-empty">Hali guruhlar yoq</div>';
+            return;
+        }
+
+        el.innerHTML = groups.map(function (g) {
+            return '<div class="friend-result-item">' +
+                '<div class="friend-result-avatar profile-avatar-fallback">👥</div>' +
+                '<span class="friend-result-name">' + escapeHtml(g.name) + ' <span class="group-member-count">(' + g.member_count + ')</span></span>' +
+                '<button class="friend-msg-btn" onclick="switchToGroupFromModal(' + g.id + ')">Ochish</button>' +
+                '</div>';
+        }).join('');
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function switchToGroupFromModal(groupId) {
+    const g = cachedGroupsList.find(function (x) { return x.id === groupId; });
+    if (!g) return;
+    switchToGroup(g.id, g.name);
+    closeGroupsModal();
+}
+
+async function switchToGroup(groupId, groupName) {
+    setActiveChatId('group_' + groupId);
+    chatHeaderTitle.textContent = '👥 ' + groupName;
+    document.getElementById('public-chat-item').classList.remove('active');
+    closeSidebar();
+
+    messagesBox.innerHTML = '<div class="empty-state"><p>Yuklanmoqda...</p></div>';
+    lastRenderedKey = null;
+
+    try {
+        const res = await fetch('/api/groups/' + groupId + '/messages');
+        const msgs = await res.json();
+
+        messagesBox.innerHTML = '';
+        lastRenderedKey = null;
+
+        if (msgs.length === 0) {
+            messagesBox.innerHTML = '<div class="empty-state"><h2>' + escapeHtml(groupName) + '</h2><p>Hali xabar yoq, birinchi bolib yozing 👋<br><span class="ai-hint">AI ni chaqirish uchun @AI deb yozing</span></p></div>';
+            return;
+        }
+
+        msgs.forEach(function (m) {
+            appendMessageToDOM({
+                username: m.sender_name,
+                message: m.message,
+                avatar: m.sender_avatar,
+                isAI: !!m.is_ai
+            }, false);
+        });
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+socket.on('group_created', function (data) {
+    loadGroupsListModal();
+    showNotificationToast("Sizni \"" + data.name + "\" guruhiga qoshishdi");
+});
+
+socket.on('group_message', function (data) {
+    if (data.clientId && sentMessageIds.has(data.clientId)) {
+        sentMessageIds.delete(data.clientId);
+        return;
+    }
+
+    const activeId = getActiveChatId();
+    if (activeId === ('group_' + data.group_id)) {
+        clearEmptyState();
+        appendMessageToDOM({
+            username: data.sender_name,
+            message: data.message,
+            avatar: data.sender_avatar,
+            isAI: !!data.is_ai,
+            prompt: data.prompt
+        }, true);
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+    } else if (!data.is_ai) {
+        showNotificationToast(data.sender_name + ' (guruh): ' + data.message.slice(0, 60));
+    }
+});
+
+/* ---------- ADMINGA MUROJAAT ---------- */
+async function sendSupportMessage() {
+    const input = document.getElementById('support-message-input');
+    const statusEl = document.getElementById('support-status');
+    const message = input.value.trim();
+
+    if (!message) return;
+
+    statusEl.textContent = 'Yuborilmoqda...';
+
+    try {
+        const res = await fetch('/api/support', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            statusEl.textContent = 'Yuborildi ✓ Tez orada koriladi';
+            input.value = '';
+            setTimeout(function () { statusEl.textContent = ''; }, 3000);
+        } else {
+            statusEl.textContent = 'Xato yuz berdi';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Xato yuz berdi';
     }
 }
 

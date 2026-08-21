@@ -108,6 +108,43 @@ class DirectMessage(db.Model):
     sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     message = db.Column(db.Text)
+    reaction = db.Column(db.String(8), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Group(db.Model):
+    __tablename__ = 'groups'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100))
+    creator_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class GroupMember(db.Model):
+    __tablename__ = 'group_members'
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+
+class GroupMessage(db.Model):
+    __tablename__ = 'group_messages'
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    is_ai = db.Column(db.Boolean, default=False)
+    message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class SupportTicket(db.Model):
+    __tablename__ = 'support_tickets'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    name = db.Column(db.String(100))
+    email = db.Column(db.String(150))
+    message = db.Column(db.Text)
+    status = db.Column(db.String(20), default='open')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -132,6 +169,14 @@ class UserAIPreference(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class AdminAuditLog(db.Model):
+    __tablename__ = 'admin_audit_log'
+    id = db.Column(db.Integer, primary_key=True)
+    action = db.Column(db.String(100))
+    detail = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 with app.app_context():
     db.create_all()
 
@@ -147,6 +192,39 @@ public_history = deque(maxlen=200)
 public_msg_counter = itertools.count(1)
 
 anonymous_message_counts = {}
+online_user_counts = {}
+
+admin_login_attempts = {}
+ADMIN_LOGIN_MAX_ATTEMPTS = 5
+ADMIN_LOGIN_LOCKOUT_MINUTES = 15
+
+
+def get_client_ip():
+    forwarded = request.headers.get('X-Forwarded-For', '')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
+
+def log_admin_action(action, detail=""):
+    entry = AdminAuditLog(action=action, detail=detail)
+    db.session.add(entry)
+    db.session.commit()
+
+
+def dangerous_action(action_name):
+    """Xavfli amallar uchun: admin paroli qayta so'raladi va amal audit jurnaliga yoziladi."""
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            data = request.get_json() or {}
+            confirm_password = data.get('confirm_password', '')
+            if confirm_password != ADMIN_PASSWORD:
+                logger.warning(f"Xavfli amalga notogri parol bilan urinish: {action_name} (IP: {get_client_ip()})")
+                return jsonify({"error": "confirm_password_required"}), 403
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 def get_user_ai_style_notes(user):
@@ -275,6 +353,14 @@ def get_friendship_row(user_id_a, user_id_b):
     ).first()
 
 
+def is_group_member(group_id, user_id):
+    return GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first() is not None
+
+
+def get_group_ids_for_user(user_id):
+    return [m.group_id for m in GroupMember.query.filter_by(user_id=user_id).all()]
+
+
 @app.route('/')
 def index():
     user = current_user()
@@ -286,7 +372,30 @@ def index():
 
 @app.route('/health')
 def health():
-    return {"status": "ok", "ai_connected": ai_client is not None}, 200
+    uptime_seconds = int((datetime.utcnow() - SERVER_START_TIME).total_seconds())
+    return {
+        "status": "ok",
+        "ai_connected": ai_client is not None,
+        "uptime_seconds": uptime_seconds
+    }, 200
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    content = "User-agent: *\nAllow: /\nSitemap: " + request.url_root.rstrip('/') + "/sitemap.xml\n"
+    return app.response_class(content, mimetype='text/plain')
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    base = request.url_root.rstrip('/')
+    content = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f'  <url><loc>{base}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>\n'
+        '</urlset>\n'
+    )
+    return app.response_class(content, mimetype='application/xml')
 
 
 @app.route('/auth/google/login')
@@ -562,7 +671,8 @@ def api_friends_list():
         output.append({
             "id": other.id,
             "name": other.name,
-            "avatar": get_display_avatar(other)
+            "avatar": get_display_avatar(other),
+            "is_online": other.id in online_user_counts
         })
 
     return jsonify(output)
@@ -610,6 +720,7 @@ def api_friend_messages(friend_id):
         "message": m.message,
         "is_mine": m.sender_id == user.id,
         "avatar": get_display_avatar(user) if m.sender_id == user.id else get_display_avatar(friend),
+        "reaction": m.reaction,
         "time": m.created_at.strftime("%H:%M")
     } for m in msgs])
 
@@ -648,17 +759,139 @@ def api_ai_feedback():
     return jsonify({"success": True})
 
 
+@app.route('/api/groups', methods=['POST'])
+@login_required_api
+def api_create_group():
+    user = current_user()
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()[:100] or "Nomsiz guruh"
+    member_ids = data.get('member_ids') or []
+
+    valid_member_ids = set()
+    for mid in member_ids:
+        try:
+            mid = int(mid)
+        except (TypeError, ValueError):
+            continue
+        if are_friends(user.id, mid):
+            valid_member_ids.add(mid)
+
+    if len(valid_member_ids) < 1:
+        return jsonify({"error": "need_at_least_one_member"}), 400
+
+    group = Group(name=name, creator_id=user.id)
+    db.session.add(group)
+    db.session.flush()
+
+    db.session.add(GroupMember(group_id=group.id, user_id=user.id))
+    for mid in valid_member_ids:
+        db.session.add(GroupMember(group_id=group.id, user_id=mid))
+
+    db.session.commit()
+
+    logger.info(f"Guruh yaratildi: '{name}' ({user.name} tomonidan)")
+
+    for mid in valid_member_ids:
+        join_room('group_' + str(group.id))
+        socketio.emit('group_created', {"group_id": group.id, "name": group.name}, room=str(mid))
+
+    return jsonify({"success": True, "group_id": group.id, "name": group.name})
+
+
+@app.route('/api/groups')
+@login_required_api
+def api_list_groups():
+    user = current_user()
+    memberships = GroupMember.query.filter_by(user_id=user.id).all()
+
+    output = []
+    for m in memberships:
+        group = db.session.get(Group, m.group_id)
+        if not group:
+            continue
+        member_count = GroupMember.query.filter_by(group_id=group.id).count()
+        output.append({"id": group.id, "name": group.name, "member_count": member_count})
+
+    return jsonify(output)
+
+
+@app.route('/api/groups/<int:group_id>/messages')
+@login_required_api
+def api_group_messages(group_id):
+    user = current_user()
+    if not is_group_member(group_id, user.id):
+        return jsonify({"error": "not_member"}), 403
+
+    msgs = GroupMessage.query.filter_by(group_id=group_id).order_by(GroupMessage.created_at.asc()).limit(200).all()
+
+    output = []
+    for m in msgs:
+        sender = db.session.get(User, m.sender_id) if m.sender_id else None
+        output.append({
+            "id": m.id,
+            "sender_id": m.sender_id,
+            "sender_name": AI_NAME if m.is_ai else (sender.name if sender else "?"),
+            "sender_avatar": None if m.is_ai else (get_display_avatar(sender) if sender else None),
+            "message": m.message,
+            "is_ai": m.is_ai,
+            "time": m.created_at.strftime("%H:%M")
+        })
+
+    return jsonify(output)
+
+
+@app.route('/api/support', methods=['POST'])
+def api_submit_support():
+    user = current_user()
+    data = request.get_json() or {}
+    message = (data.get('message') or '').strip()[:2000]
+    name = (data.get('name') or (user.name if user else '')).strip()[:100]
+    email = (data.get('email') or (user.email if user else '')).strip()[:150]
+
+    if not message:
+        return jsonify({"error": "empty_message"}), 400
+
+    ticket = SupportTicket(
+        user_id=user.id if user else None,
+        name=name or 'Anonim',
+        email=email,
+        message=message
+    )
+    db.session.add(ticket)
+    db.session.commit()
+
+    logger.info(f"Yangi murojaat: {name or 'Anonim'} ({email})")
+
+    return jsonify({"success": True})
+
+
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     error = None
+    ip = get_client_ip()
+    record = admin_login_attempts.get(ip)
+
+    if record and record.get('locked_until') and datetime.utcnow() < record['locked_until']:
+        remaining = int((record['locked_until'] - datetime.utcnow()).total_seconds() / 60) + 1
+        return render_template('admin_login.html', error=f"Juda kop notogri urinish. {remaining} daqiqadan song qayta urinib koring.")
+
     if request.method == 'POST':
         password = request.form.get('password', '')
         if password == ADMIN_PASSWORD:
             session['is_admin'] = True
             session.permanent = True
+            admin_login_attempts.pop(ip, None)
+            log_admin_action("admin_login", f"IP: {ip}")
             return redirect(url_for('admin_dashboard'))
         else:
-            error = "Parol notogri"
+            record = admin_login_attempts.setdefault(ip, {"count": 0, "locked_until": None})
+            record['count'] += 1
+            if record['count'] >= ADMIN_LOGIN_MAX_ATTEMPTS:
+                record['locked_until'] = datetime.utcnow() + timedelta(minutes=ADMIN_LOGIN_LOCKOUT_MINUTES)
+                logger.warning(f"Admin login bloklandi (IP: {ip}) — juda kop notogri urinish.")
+                error = f"Juda kop notogri urinish. {ADMIN_LOGIN_LOCKOUT_MINUTES} daqiqaga bloklandingiz."
+            else:
+                error = f"Parol notogri. Yana {ADMIN_LOGIN_MAX_ATTEMPTS - record['count']} ta urinish qoldi."
     return render_template('admin_login.html', error=error)
 
 
@@ -762,6 +995,7 @@ def admin_broadcast():
     socketio.emit('public_response_message', entry)
 
     logger.info(f"Admin elon yubordi: {text}")
+    log_admin_action("broadcast", text[:200])
 
     return jsonify({"success": True})
 
@@ -799,6 +1033,10 @@ def admin_toggle_ban(user_id):
     db.session.commit()
 
     logger.info(f"Admin foydalanuvchini {'bloklandi' if user.is_banned else 'blokdan chiqarildi'}: {user.email}")
+    log_admin_action("toggle_ban", f"user#{user_id} ({user.email}) -> {'banned' if user.is_banned else 'unbanned'}")
+
+    if user.is_banned:
+        socketio.emit('force_logout', {"reason": "banned"}, room=str(user_id))
 
     return jsonify({"success": True, "is_banned": user.is_banned})
 
@@ -818,8 +1056,126 @@ def admin_delete_message(msg_id):
 
     if found:
         socketio.emit('message_deleted', {'id': msg_id})
+        log_admin_action("delete_public_message", f"msg#{msg_id}")
 
     return jsonify({"success": found})
+
+
+@app.route('/admin/api/users/<int:user_id>/messages')
+@admin_required
+def admin_view_user_messages(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"error": "not_found"}), 404
+
+    msgs = DirectMessage.query.filter(
+        db.or_(DirectMessage.sender_id == user_id, DirectMessage.receiver_id == user_id)
+    ).order_by(DirectMessage.created_at.desc()).limit(100).all()
+
+    log_admin_action("view_user_messages", f"user#{user_id} ({user.email})")
+
+    return jsonify([{
+        "id": m.id,
+        "sender_id": m.sender_id,
+        "receiver_id": m.receiver_id,
+        "message": m.message,
+        "time": m.created_at.strftime("%Y-%m-%d %H:%M")
+    } for m in msgs])
+
+
+@app.route('/admin/api/users/<int:user_id>/delete', methods=['POST'])
+@admin_required
+@dangerous_action("delete_user")
+def admin_delete_user(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"error": "not_found"}), 404
+
+    if is_admin_user(user):
+        return jsonify({"error": "cannot_delete_admin"}), 400
+
+    FriendRequest.query.filter(
+        db.or_(FriendRequest.sender_id == user_id, FriendRequest.receiver_id == user_id)
+    ).delete(synchronize_session=False)
+    DirectMessage.query.filter(
+        db.or_(DirectMessage.sender_id == user_id, DirectMessage.receiver_id == user_id)
+    ).delete(synchronize_session=False)
+    AIFeedback.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+    UserAIPreference.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+
+    email = user.email
+    db.session.delete(user)
+    db.session.commit()
+
+    logger.warning(f"Admin foydalanuvchini BUTUNLAY OCHIRDI: user#{user_id} ({email})")
+    log_admin_action("delete_user", f"user#{user_id} ({email})")
+
+    socketio.emit('force_logout', {"reason": "account_deleted"}, room=str(user_id))
+
+    return jsonify({"success": True})
+
+
+@app.route('/admin/api/export/users', methods=['POST'])
+@admin_required
+@dangerous_action("export_users")
+def admin_export_users():
+    users = User.query.all()
+    data = [{
+        "id": u.id,
+        "name": u.name,
+        "email": u.email,
+        "is_banned": u.is_banned,
+        "created_at": u.created_at.strftime("%Y-%m-%d") if u.created_at else ''
+    } for u in users]
+
+    log_admin_action("export_users", f"{len(data)} ta foydalanuvchi")
+
+    return jsonify(data)
+
+
+@app.route('/admin/api/support')
+@admin_required
+def admin_list_support():
+    status_filter = request.args.get('status', 'open')
+    query = SupportTicket.query
+    if status_filter in ('open', 'resolved'):
+        query = query.filter_by(status=status_filter)
+    tickets = query.order_by(SupportTicket.created_at.desc()).limit(100).all()
+
+    return jsonify([{
+        "id": t.id,
+        "name": t.name,
+        "email": t.email,
+        "message": t.message,
+        "status": t.status,
+        "time": t.created_at.strftime("%Y-%m-%d %H:%M")
+    } for t in tickets])
+
+
+@app.route('/admin/api/support/<int:ticket_id>/resolve', methods=['POST'])
+@admin_required
+def admin_resolve_support(ticket_id):
+    ticket = db.session.get(SupportTicket, ticket_id)
+    if not ticket:
+        return jsonify({"error": "not_found"}), 404
+
+    ticket.status = 'resolved'
+    db.session.commit()
+
+    log_admin_action("resolve_support_ticket", f"ticket#{ticket_id} ({ticket.email})")
+
+    return jsonify({"success": True})
+
+
+@app.route('/admin/api/audit-log')
+@admin_required
+def admin_audit_log():
+    entries = AdminAuditLog.query.order_by(AdminAuditLog.created_at.desc()).limit(150).all()
+    return jsonify([{
+        "action": e.action,
+        "detail": e.detail,
+        "time": e.created_at.strftime("%Y-%m-%d %H:%M:%S")
+    } for e in entries])
 
 
 @socketio.on('connect')
@@ -830,6 +1186,12 @@ def handle_connect():
     user = current_user()
     if user:
         join_room(str(user.id))
+        for gid in get_group_ids_for_user(user.id):
+            join_room('group_' + str(gid))
+
+        online_user_counts[user.id] = online_user_counts.get(user.id, 0) + 1
+        if online_user_counts[user.id] == 1:
+            socketio.emit('friend_online', {"user_id": user.id})
 
     logger.info(f"Yangi foydalanuvchi ulandi. Hozir onlayn: {len(connected_sids)}")
 
@@ -838,6 +1200,14 @@ def handle_connect():
 def handle_disconnect():
     connected_sids.discard(request.sid)
     anonymous_message_counts.pop(request.sid, None)
+
+    user = current_user()
+    if user and user.id in online_user_counts:
+        online_user_counts[user.id] -= 1
+        if online_user_counts[user.id] <= 0:
+            online_user_counts.pop(user.id, None)
+            socketio.emit('friend_offline', {"user_id": user.id})
+
     logger.info(f"Foydalanuvchi uzildi. Hozir onlayn: {len(connected_sids)}")
 
 
@@ -991,6 +1361,106 @@ def handle_friend_message(data):
         }
         emit('friend_message', ai_payload, room=str(to_id))
         emit('friend_message', ai_payload, room=str(user.id))
+
+
+@socketio.on('react_public')
+def handle_react_public(data):
+    msg_id = data.get('msg_id')
+    emoji = (data.get('emoji') or '').strip()[:8]
+    if not msg_id or not emoji:
+        return
+
+    for m in public_history:
+        if m.get('id') == msg_id:
+            m['reaction'] = emoji
+            break
+
+    emit('public_reaction_update', {'id': msg_id, 'emoji': emoji}, broadcast=True)
+
+
+@socketio.on('react_friend')
+def handle_react_friend(data):
+    user = current_user()
+    if not user:
+        return
+
+    msg_id = data.get('msg_id')
+    to_id = data.get('to_user_id')
+    emoji = (data.get('emoji') or '').strip()[:8]
+
+    if not msg_id or not to_id or not emoji:
+        return
+
+    if not are_friends(user.id, to_id):
+        return
+
+    row = db.session.get(DirectMessage, msg_id)
+    if not row or row.sender_id not in (user.id, int(to_id)) or row.receiver_id not in (user.id, int(to_id)):
+        return
+
+    row.reaction = emoji
+    db.session.commit()
+
+    payload = {'id': msg_id, 'emoji': emoji}
+    emit('friend_reaction_update', payload, room=str(to_id))
+    emit('friend_reaction_update', payload, room=str(user.id))
+
+
+@socketio.on('group_message')
+def handle_group_message(data):
+    user = current_user()
+    if not user or user.is_banned:
+        return
+
+    group_id = data.get('group_id')
+    msg = (data.get('message') or '').strip()[:2000]
+    client_id = data.get('clientId')
+
+    if not msg or not group_id or not is_group_member(group_id, user.id):
+        return
+
+    row = GroupMessage(group_id=group_id, sender_id=user.id, message=msg, is_ai=False)
+    db.session.add(row)
+    db.session.commit()
+
+    payload = {
+        "id": row.id,
+        "group_id": group_id,
+        "sender_id": user.id,
+        "sender_name": user.name,
+        "sender_avatar": get_display_avatar(user),
+        "message": msg,
+        "is_ai": False,
+        "time": row.created_at.strftime("%H:%M"),
+        "clientId": client_id
+    }
+    emit('group_message', payload, room='group_' + str(group_id))
+
+    if AI_TRIGGER in msg.lower():
+        group = db.session.get(Group, group_id)
+        note = (
+            "Siz hozir \"" + (group.name if group else "guruh") + "\" nomli dostlar guruh suhbatiga "
+            "uchinchi ishtirokchi sifatida qoshildingiz. Sizni @AI deb chaqirishdi. "
+            "Do'stona, qisqa javob bering, suhbat kontekstiga mos boling."
+        )
+        ai_reply = get_ai_response(msg, user=user, extra_system_note=note)
+
+        ai_row = GroupMessage(group_id=group_id, sender_id=None, message=ai_reply, is_ai=True)
+        db.session.add(ai_row)
+        db.session.commit()
+
+        ai_payload = {
+            "id": ai_row.id,
+            "group_id": group_id,
+            "sender_id": None,
+            "sender_name": AI_NAME,
+            "sender_avatar": None,
+            "message": ai_reply,
+            "is_ai": True,
+            "time": ai_row.created_at.strftime("%H:%M"),
+            "prompt": msg
+        }
+        emit('group_message', ai_payload, room='group_' + str(group_id))
 
 
 if __name__ == '__main__':

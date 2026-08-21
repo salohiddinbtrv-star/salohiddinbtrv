@@ -54,8 +54,40 @@
                 </div>
             </div>
 
+            <div class="stats-grid stats-grid-secondary">
+                <div class="stat-card">
+                    <span class="stat-label">👍 AI qoniqish darajasi</span>
+                    <span class="stat-value stat-value-sm" id="stat-ai-satisfaction">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">🎯 Shaxsiylashtirilgan foydalanuvchilar</span>
+                    <span class="stat-value stat-value-sm" id="stat-personalized-users">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">🤝 Jami dostliklar</span>
+                    <span class="stat-value stat-value-sm" id="stat-friendships">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">⏳ Kutilayotgan sorovlar</span>
+                    <span class="stat-value stat-value-sm" id="stat-pending-requests">—</span>
+                </div>
+            </div>
+
             <section class="history-section">
-                <h2>Foydalanuvchilar</h2>
+                <h2>📢 Ommaviy e'lon yuborish</h2>
+                <p class="section-hint">Bu xabar barcha foydalanuvchilarga Ochiq Suhbatda darhol korinadi.</p>
+                <div class="broadcast-form">
+                    <input type="text" id="broadcast-input" class="user-search-input" placeholder="E'lon matnini yozing..." maxlength="500">
+                    <button class="broadcast-btn" onclick="sendBroadcast()">Yuborish</button>
+                </div>
+                <span id="broadcast-status" class="profile-save-status"></span>
+            </section>
+
+            <section class="history-section">
+                <div class="section-header-row">
+                    <h2>Foydalanuvchilar</h2>
+                    <button class="danger-btn danger-btn-outline" onclick="exportUsers()">⬇ Eksport (JSON)</button>
+                </div>
                 <input type="text" id="user-search" class="user-search-input" placeholder="Ism yoki email boyicha qidirish..." oninput="loadUsers()">
                 <div class="user-list" id="user-list"></div>
             </section>
@@ -67,9 +99,9 @@
                     <div class="history-item">
                         <span class="history-time">{{ h.time }}</span>
                         <strong>{{ h.username }}:</strong> {{ h.message }}
-                        <<button class="delete-msg-btn" data-id="{{ h.id }}" onclick="deleteMessage(this.dataset.id)">
-    O'chirish
-</button>
+                        <button class="delete-msg-btn" data-id="{{ h.id }}" onclick="deleteMessage(this.dataset.id)">
+                            O'chirish
+                        </button>
                     </div>
                     {% else %}
                     <div class="history-empty">Hali xabar yo'q</div>
@@ -77,10 +109,20 @@
                 </div>
             </section>
 
+            <section class="history-section">
+                <h2>🛡 Audit jurnali</h2>
+                <p class="section-hint">Barcha admin amallarining xavfsizlik yozuvlari — kim, qachon, nima qildi.</p>
+                <div class="history-list" id="audit-log-list"></div>
+            </section>
+
         </main>
     </div>
 
     <script>
+        function askAdminPassword(actionLabel) {
+            return prompt('Xavfli amal: "' + actionLabel + '".\nDavom etish uchun admin parolini qayta kiriting:');
+        }
+
         async function refreshStats() {
             try {
                 const res = await fetch('/admin/api/stats');
@@ -106,6 +148,56 @@
             }
         }
 
+        async function loadAIStats() {
+            try {
+                const res = await fetch('/admin/api/ai-stats');
+                const data = await res.json();
+                document.getElementById('stat-ai-satisfaction').textContent =
+                    data.satisfaction_percent === null ? "Hali baholanmagan" : data.satisfaction_percent + '% (' + data.total_likes + ' 👍 / ' + data.total_dislikes + ' 👎)';
+                document.getElementById('stat-personalized-users').textContent = data.personalized_users;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadFriendsOverview() {
+            try {
+                const res = await fetch('/admin/api/friends-overview');
+                const data = await res.json();
+                document.getElementById('stat-friendships').textContent = data.total_friendships;
+                document.getElementById('stat-pending-requests').textContent = data.pending_requests;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function sendBroadcast() {
+            const input = document.getElementById('broadcast-input');
+            const statusEl = document.getElementById('broadcast-status');
+            const text = input.value.trim();
+            if (!text) return;
+
+            statusEl.textContent = 'Yuborilmoqda...';
+            try {
+                const res = await fetch('/admin/api/broadcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    statusEl.textContent = 'Yuborildi ✓';
+                    input.value = '';
+                    loadAuditLog();
+                    setTimeout(function () { statusEl.textContent = ''; }, 2000);
+                } else {
+                    statusEl.textContent = 'Xato yuz berdi';
+                }
+            } catch (e) {
+                statusEl.textContent = 'Xato yuz berdi';
+            }
+        }
+
         async function loadUsers() {
             const search = document.getElementById('user-search').value;
             try {
@@ -119,10 +211,18 @@
                 }
 
                 list.innerHTML = users.map(function (u) {
+                    const safeName = u.name.replace(/'/g, "\\'");
+                    let actionsHtml = '';
+                    if (!u.is_admin) {
+                        actionsHtml =
+                            '<button class="ban-btn ' + (u.is_banned ? 'banned' : '') + '" onclick="toggleBan(' + u.id + ')">' + (u.is_banned ? 'Blokdan chiqarish' : 'Bloklash') + '</button>' +
+                            '<button class="msg-view-btn" onclick="viewUserMessages(' + u.id + ', \'' + safeName + '\')">Xabarlar</button>' +
+                            '<button class="danger-btn" onclick="deleteUser(' + u.id + ', \'' + safeName + '\')">Ochirish</button>';
+                    }
                     return '<div class="user-item">' +
                         '<span class="user-item-name">' + u.name + (u.is_admin ? ' 👑' : '') + '</span>' +
                         '<span class="user-item-email">' + u.email + '</span>' +
-                        (u.is_admin ? '' : '<button class="ban-btn ' + (u.is_banned ? 'banned' : '') + '" onclick="toggleBan(' + u.id + ')">' + (u.is_banned ? 'Blokdan chiqarish' : 'Bloklash') + '</button>') +
+                        actionsHtml +
                         '</div>';
                 }).join('');
             } catch (e) {
@@ -134,6 +234,84 @@
             try {
                 await fetch('/admin/api/users/' + userId + '/ban', { method: 'POST' });
                 loadUsers();
+                loadAuditLog();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function viewUserMessages(userId, userName) {
+            try {
+                const res = await fetch('/admin/api/users/' + userId + '/messages');
+                const msgs = await res.json();
+                loadAuditLog();
+
+                if (msgs.length === 0) {
+                    alert(userName + " uchun shaxsiy xabarlar topilmadi.");
+                    return;
+                }
+
+                const text = msgs.map(function (m) {
+                    return '[' + m.time + '] #' + m.sender_id + ' -> #' + m.receiver_id + ': ' + m.message;
+                }).join('\n');
+
+                alert(userName + " xabarlari (oxirgi 100 ta):\n\n" + text);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function deleteUser(userId, userName) {
+            if (!confirm(userName + " hisobini BUTUNLAY OCHIRISHNI tasdiqlaysizmi?\nBu amalni ORQAGA QAYTARIB BOLMAYDI.")) return;
+
+            const password = askAdminPassword("Foydalanuvchini ochirish: " + userName);
+            if (!password) return;
+
+            try {
+                const res = await fetch('/admin/api/users/' + userId + '/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirm_password: password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    loadUsers();
+                    loadAuditLog();
+                } else if (data.error === 'confirm_password_required') {
+                    alert('Parol notogri. Amal bekor qilindi.');
+                } else {
+                    alert('Xato: ' + (data.error || 'nomalum'));
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function exportUsers() {
+            const password = askAdminPassword("Foydalanuvchilar royxatini eksport qilish");
+            if (!password) return;
+
+            try {
+                const res = await fetch('/admin/api/export/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirm_password: password })
+                });
+                const data = await res.json();
+
+                if (Array.isArray(data)) {
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'notfic_users_export.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    loadAuditLog();
+                } else {
+                    alert('Parol notogri yoki xato yuz berdi.');
+                }
             } catch (e) {
                 console.error(e);
             }
@@ -144,13 +322,38 @@
             try {
                 await fetch('/admin/api/messages/' + msgId, { method: 'DELETE' });
                 refreshStats();
+                loadAuditLog();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadAuditLog() {
+            try {
+                const res = await fetch('/admin/api/audit-log');
+                const entries = await res.json();
+                const el = document.getElementById('audit-log-list');
+                if (!el) return;
+
+                if (entries.length === 0) {
+                    el.innerHTML = '<div class="history-empty">Hali yozuv yoq</div>';
+                    return;
+                }
+
+                el.innerHTML = entries.map(function (e) {
+                    return '<div class="history-item"><span class="history-time">' + e.time + '</span><strong>' + e.action + '</strong>' + (e.detail ? ' — ' + e.detail : '') + '</div>';
+                }).join('');
             } catch (e) {
                 console.error(e);
             }
         }
 
         loadUsers();
+        loadAIStats();
+        loadFriendsOverview();
+        loadAuditLog();
         setInterval(refreshStats, 5000);
+        setInterval(loadAuditLog, 15000);
     </script>
 
 </body>
