@@ -2,10 +2,6 @@ import os
 
 IS_RENDER = os.environ.get("RENDER") is not None
 
-if IS_RENDER:
-    import eventlet
-    eventlet.monkey_patch()
-
 import base64
 import logging
 import itertools
@@ -60,7 +56,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 db = SQLAlchemy(app)
 
-async_mode = 'eventlet' if IS_RENDER else 'threading'
+async_mode = 'threading'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
 
 ai_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
