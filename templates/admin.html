@@ -110,6 +110,14 @@
             </section>
 
             <section class="history-section">
+                <div class="section-header-row">
+                    <h2>📩 Foydalanuvchi murojaatlari</h2>
+                    <span id="support-count-badge" class="support-count-badge" style="display:none"></span>
+                </div>
+                <div class="history-list" id="support-list"></div>
+            </section>
+
+            <section class="history-section">
                 <h2>🛡 Audit jurnali</h2>
                 <p class="section-hint">Barcha admin amallarining xavfsizlik yozuvlari — kim, qachon, nima qildi.</p>
                 <div class="history-list" id="audit-log-list"></div>
@@ -348,12 +356,59 @@
             }
         }
 
+        async function loadSupportTickets() {
+            try {
+                const res = await fetch('/admin/api/support?status=open');
+                const tickets = await res.json();
+                const el = document.getElementById('support-list');
+                const badge = document.getElementById('support-count-badge');
+
+                if (badge) {
+                    if (tickets.length > 0) {
+                        badge.textContent = tickets.length + ' ta ochiq';
+                        badge.style.display = 'inline-flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+
+                if (!el) return;
+
+                if (tickets.length === 0) {
+                    el.innerHTML = '<div class="history-empty">Ochiq murojaatlar yoq</div>';
+                    return;
+                }
+
+                el.innerHTML = tickets.map(function (t) {
+                    return '<div class="history-item">' +
+                        '<span class="history-time">' + t.time + '</span>' +
+                        '<strong>' + t.name + '</strong> (' + (t.email || 'email yoq') + '): ' + t.message +
+                        ' <button class="delete-msg-btn" onclick="resolveSupportTicket(' + t.id + ')">Hal qilindi</button>' +
+                        '</div>';
+                }).join('');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function resolveSupportTicket(ticketId) {
+            try {
+                await fetch('/admin/api/support/' + ticketId + '/resolve', { method: 'POST' });
+                loadSupportTickets();
+                loadAuditLog();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
         loadUsers();
         loadAIStats();
         loadFriendsOverview();
         loadAuditLog();
+        loadSupportTickets();
         setInterval(refreshStats, 5000);
         setInterval(loadAuditLog, 15000);
+        setInterval(loadSupportTickets, 15000);
     </script>
 
 </body>

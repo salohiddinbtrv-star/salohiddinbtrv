@@ -211,6 +211,18 @@ body {
 
 .danger-btn-outline:hover { background: #FBEAEA; opacity: 1; }
 
+.support-count-badge {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
 .stat-card {
     background: var(--panel);
     border: 1px solid var(--border);

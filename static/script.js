@@ -124,21 +124,49 @@ function makeChatListItem(id, chats, activeId) {
         };
     })(id);
 
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'chat-item-delete-btn';
-    deleteBtn.setAttribute('aria-label', 'Suhbatni ochirish');
-    deleteBtn.innerHTML = '✕';
-    deleteBtn.onclick = (function (chatId) {
+    const menuWrap = document.createElement('div');
+    menuWrap.className = 'chat-item-menu-wrap';
+
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'chat-item-menu-btn';
+    menuBtn.setAttribute('aria-label', 'Suhbat menyusi');
+    menuBtn.innerHTML = '⋯';
+    menuBtn.onclick = function (event) {
+        event.stopPropagation();
+        document.querySelectorAll('.chat-item-menu-wrap.open').forEach(function (w) {
+            if (w !== menuWrap) w.classList.remove('open');
+        });
+        menuWrap.classList.toggle('open');
+    };
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'chat-item-dropdown';
+
+    const deleteOption = document.createElement('button');
+    deleteOption.className = 'chat-item-dropdown-option';
+    deleteOption.textContent = "O'chirish";
+    deleteOption.onclick = (function (chatId) {
         return function (event) {
             event.stopPropagation();
+            menuWrap.classList.remove('open');
             deleteAIChat(chatId);
         };
     })(id);
 
+    dropdown.appendChild(deleteOption);
+    menuWrap.appendChild(menuBtn);
+    menuWrap.appendChild(dropdown);
+
     item.appendChild(titleSpan);
-    item.appendChild(deleteBtn);
+    item.appendChild(menuWrap);
     return item;
 }
+
+document.addEventListener('click', function () {
+    document.querySelectorAll('.chat-item-menu-wrap.open').forEach(function (w) {
+        w.classList.remove('open');
+    });
+});
 
 function deleteAIChat(chatId) {
     if (!confirm("Bu AI suhbatini ochirishni tasdiqlaysizmi?")) return;
@@ -328,12 +356,15 @@ function pickReaction(el, emoji) {
 }
 
 function appendMessageToDOM(data, animate) {
-    const groupKey = (data.isAI ? 'ai' : 'user') + '::' + data.username;
+    const rowKind = data.isAI ? 'ai' : (data.isMine ? 'mine' : 'other');
+    const groupKey = rowKind + '::' + data.username;
     const isGrouped = (groupKey === lastRenderedKey);
     lastRenderedKey = groupKey;
 
+    const rowClass = data.isAI ? 'ai-row' : (data.isMine ? 'user-row' : 'other-row');
+
     const row = document.createElement('div');
-    row.className = 'message-row' + (data.isAI ? ' ai-row' : ' user-row') + (isGrouped ? ' grouped' : '');
+    row.className = 'message-row ' + rowClass + (isGrouped ? ' grouped' : '');
     if (animate) row.classList.add('msg-enter');
     if (data.id) row.setAttribute('data-msg-id', data.id);
     row.setAttribute('data-chat-kind', currentChatKind());
@@ -451,11 +482,13 @@ socket.on('message_deleted', function (data) {
 socket.on('friend_request_received', function (data) {
     loadFriendRequests();
     showNotificationToast(data.name + ' sizga dostlik taklifi yubordi');
+    showBrowserNotification('Notfic', data.name + ' sizga dostlik taklifi yubordi');
 });
 
 socket.on('friend_request_accepted', function (data) {
     loadFriendsListModal();
     showNotificationToast(data.name + ' taklifingizni qabul qildi');
+    showBrowserNotification('Notfic', data.name + ' taklifingizni qabul qildi');
 });
 
 socket.on('force_logout', function (data) {
@@ -531,6 +564,7 @@ socket.on('ai_response_message', function (data) {
         messagesBox.scrollTop = messagesBox.scrollHeight;
     }
     updateHeader();
+    showBrowserNotification('Notfic', data.message.slice(0, 100));
 });
 
 socket.on('ai_typing', function (data) {
@@ -550,7 +584,7 @@ function showTypingIndicator() {
     row.innerHTML =
         '<div class="msg-avatar msg-avatar-ai">⚡</div>' +
         '<div class="message-bubble-wrap">' +
-            '<strong>Notfic AI</strong>' +
+            '<strong>Notfic</strong>' +
             '<div class="message typing-indicator"><span class="typing-dots"><span></span><span></span><span></span></span></div>' +
         '</div>';
     messagesBox.appendChild(row);
@@ -810,6 +844,7 @@ async function switchToFriend(friendId, friendName, friendAvatar) {
                 message: m.message,
                 avatar: m.avatar,
                 isAI: false,
+                isMine: m.is_mine,
                 reaction: m.reaction
             }, false);
         });
@@ -961,10 +996,12 @@ async function switchToGroup(groupId, groupName) {
 
         msgs.forEach(function (m) {
             appendMessageToDOM({
-                username: m.sender_name,
+                id: m.id,
+                username: m.is_mine ? 'Siz' : m.sender_name,
                 message: m.message,
                 avatar: m.sender_avatar,
-                isAI: !!m.is_ai
+                isAI: !!m.is_ai,
+                isMine: !!m.is_mine
             }, false);
         });
         messagesBox.scrollTop = messagesBox.scrollHeight;
@@ -997,10 +1034,19 @@ socket.on('group_message', function (data) {
         messagesBox.scrollTop = messagesBox.scrollHeight;
     } else if (!data.is_ai) {
         showNotificationToast(data.sender_name + ' (guruh): ' + data.message.slice(0, 60));
+        showBrowserNotification(data.sender_name + ' (guruh)', data.message.slice(0, 100));
     }
 });
 
 /* ---------- ADMINGA MUROJAAT ---------- */
+function openSupportModal() {
+    document.getElementById('support-modal').classList.add('open');
+}
+
+function closeSupportModal() {
+    document.getElementById('support-modal').classList.remove('open');
+}
+
 async function sendSupportMessage() {
     const input = document.getElementById('support-message-input');
     const statusEl = document.getElementById('support-status');
@@ -1021,7 +1067,10 @@ async function sendSupportMessage() {
         if (data.success) {
             statusEl.textContent = 'Yuborildi ✓ Tez orada koriladi';
             input.value = '';
-            setTimeout(function () { statusEl.textContent = ''; }, 3000);
+            setTimeout(function () {
+                statusEl.textContent = '';
+                closeSupportModal();
+            }, 2000);
         } else {
             statusEl.textContent = 'Xato yuz berdi';
         }
@@ -1053,6 +1102,7 @@ socket.on('friend_message', function (data) {
         messagesBox.scrollTop = messagesBox.scrollHeight;
     } else if (!data.isAI && data.sender_name) {
         showNotificationToast(data.sender_name + ': ' + data.message.slice(0, 60));
+        showBrowserNotification(data.sender_name, data.message.slice(0, 100));
     }
 });
 
@@ -1081,7 +1131,8 @@ function sendMessage() {
             username: 'Siz',
             message: message,
             avatar: (myAvatar && myAvatar.tagName === 'IMG') ? myAvatar.src : null,
-            isAI: false
+            isAI: false,
+            isMine: true
         }, true);
         messagesBox.scrollTop = messagesBox.scrollHeight;
         socket.emit('friend_message', { to_user_id: friendId, message: message, clientId: clientId });
@@ -1089,10 +1140,27 @@ function sendMessage() {
         return;
     }
 
+    if (activeId.indexOf('group_') === 0) {
+        const groupId = parseInt(activeId.replace('group_', ''), 10);
+        clearEmptyState();
+        const myAvatar = document.getElementById('sidebar-avatar-img');
+        appendMessageToDOM({
+            username: 'Siz',
+            message: message,
+            avatar: (myAvatar && myAvatar.tagName === 'IMG') ? myAvatar.src : null,
+            isAI: false,
+            isMine: true
+        }, true);
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+        socket.emit('group_message', { group_id: groupId, message: message, clientId: clientId });
+        messageInput.value = '';
+        return;
+    }
+
     const myAvatarEl = document.getElementById('sidebar-avatar-img');
     const myAvatar = (myAvatarEl && myAvatarEl.tagName === 'IMG') ? myAvatarEl.src : null;
 
-    const localData = { username: username, message: message, avatar: myAvatar, isAI: false, clientId: clientId };
+    const localData = { username: username, message: message, avatar: myAvatar, isAI: false, isMine: true, clientId: clientId };
 
     clearEmptyState();
     appendMessageToDOM(localData, true);
@@ -1131,6 +1199,58 @@ function sendMessage() {
 }
 
 /* ---------- SOZLAMALAR / MAVZU ---------- */
+/* ---------- BRAUZER BILDIRISHNOMALARI ---------- */
+const NOTIF_PREF_KEY = 'notfic_notifications_enabled';
+
+function notificationsEnabled() {
+    return localStorage.getItem(NOTIF_PREF_KEY) === 'true' && 'Notification' in window && Notification.permission === 'granted';
+}
+
+async function enableBrowserNotifications() {
+    if (!('Notification' in window)) {
+        alert('Brauzeringiz bildirishnomalarni qollab-quvvatlamaydi.');
+        return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+        localStorage.setItem(NOTIF_PREF_KEY, 'true');
+        showBrowserNotification('Notfic', 'Bildirishnomalar yoqildi ✓', true);
+    } else {
+        localStorage.setItem(NOTIF_PREF_KEY, 'false');
+    }
+    updateNotifSettingsUI();
+}
+
+function disableBrowserNotifications() {
+    localStorage.setItem(NOTIF_PREF_KEY, 'false');
+    updateNotifSettingsUI();
+}
+
+function updateNotifSettingsUI() {
+    const label = document.getElementById('notif-toggle-label');
+    const btn = document.getElementById('notif-toggle-btn');
+    if (!label || !btn) return;
+
+    const enabled = notificationsEnabled();
+    label.textContent = enabled ? 'Yoqilgan' : "Ochirilgan";
+    btn.onclick = enabled ? disableBrowserNotifications : enableBrowserNotifications;
+}
+
+function showBrowserNotification(title, body, force) {
+    if (!notificationsEnabled()) return;
+    if (!force && document.visibilityState === 'visible' && document.hasFocus()) return;
+
+    try {
+        const n = new Notification(title, { body: body, tag: 'notfic-' + Date.now() });
+        n.onclick = function () {
+            window.focus();
+            n.close();
+        };
+    } catch (e) {
+        console.error(e);
+    }
+}
+
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(THEME_KEY, theme);
@@ -1261,8 +1381,15 @@ function updateAvatarImages(url) {
 /* ---------- BOSHLANG'ICH YUKLASH ---------- */
 window.addEventListener('DOMContentLoaded', function() {
     applyTheme(localStorage.getItem(THEME_KEY) || 'light');
+    updateNotifSettingsUI();
 
-    setActiveChatId(PUBLIC_ID);
+    const chats = loadChats();
+    const chatIds = Object.keys(chats).sort(function (a, b) { return b.localeCompare(a); });
+    if (chatIds.length > 0) {
+        setActiveChatId(chatIds[0]);
+    } else {
+        setActiveChatId('chat_' + Date.now());
+    }
 
     renderChatList();
     renderMessages();

@@ -30,7 +30,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "notfic_secret_key_123")
 AI_MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-20b")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "notfic_admin_2026")
 ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or "").strip().lower()
-AI_NAME = "Notfic AI ⚡"
+AI_NAME = "Notfic"
 AI_TRIGGER = "@ai"
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -75,7 +75,7 @@ google = oauth.register(
 )
 
 SYSTEM_PROMPT = (
-    "Sening isming Notfic AI. Sen Notfic platformasining aqlli yordamchisisan. "
+    "Sening isming Notfic. Sen Notfic platformasining aqlli yordamchisisan. "
     "Do'stona, qisqa, tushunarli va aqlli javob ber."
 )
 
@@ -251,10 +251,10 @@ def get_user_ai_style_notes(user):
 
 def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None) -> str:
     if not ai_client:
-        return f"🤖 [{AI_NAME}]: Hozircha AI ulanmagan — server tomonida API kalit sozlanmagan."
+        return f"{AI_NAME}: Hozircha ulanmagan — server tomonida API kalit sozlanmagan."
 
     if not prompt or not prompt.strip():
-        return f"🤖 [{AI_NAME}]: Savolingizni yozing, men yordam berishga tayyorman!"
+        return f"{AI_NAME}: Savolingizni yozing, men yordam berishga tayyorman!"
 
     style_notes = get_user_ai_style_notes(user)
     system_content = SYSTEM_PROMPT
@@ -285,7 +285,7 @@ def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None
 
     except Exception as e:
         logger.error(f"Groq AI xatosi: {e}")
-        return f"🤖 [{AI_NAME}]: Hozir javob bera olmadim, birozdan so'ng qayta urinib ko'ring."
+        return f"{AI_NAME}: Hozir javob bera olmadim, birozdan so'ng qayta urinib ko'ring."
 
 
 def current_user():
@@ -834,6 +834,7 @@ def api_group_messages(group_id):
             "sender_avatar": None if m.is_ai else (get_display_avatar(sender) if sender else None),
             "message": m.message,
             "is_ai": m.is_ai,
+            "is_mine": (not m.is_ai) and m.sender_id == user.id,
             "time": m.created_at.strftime("%H:%M")
         })
 
