@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -11,6 +10,13 @@
     <meta property="og:description" content="Sun'iy intellekt bilan suhbatlashing, do'stlaringiz bilan yozishing — barchasi bitta joyda.">
     <meta property="og:type" content="website">
     <link rel="canonical" href="https://notfic.uz/">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#C15F3C">
+    <link rel="icon" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Notfic">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
@@ -302,6 +308,17 @@
                 </a>
             </div>
         </div>
+    </div>
+
+    <!-- ILOVA O'RNATISH BANERI -->
+    <div id="install-banner" class="install-banner">
+        <div class="install-banner-icon">⚡</div>
+        <div class="install-banner-text-wrap">
+            <strong>Notfic'ni ornating</strong>
+            <span id="install-banner-text">Tezroq va qulayroq foydalanish uchun ilovani ornating.</span>
+        </div>
+        <button id="install-banner-btn" class="install-banner-btn" onclick="installApp()">Ornatish</button>
+        <button class="install-banner-close" onclick="dismissInstallBanner()" aria-label="Yopish">✕</button>
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>

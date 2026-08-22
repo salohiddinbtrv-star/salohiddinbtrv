@@ -1379,6 +1379,65 @@ function updateAvatarImages(url) {
 }
 
 /* ---------- BOSHLANG'ICH YUKLASH ---------- */
+/* ---------- PWA: ILOVA SIFATIDA O'RNATISH ---------- */
+const INSTALL_DISMISS_KEY = 'notfic_install_dismissed';
+let deferredInstallPrompt = null;
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function (e) {
+            console.error('Service worker royxatga olinmadi:', e);
+        });
+    });
+}
+
+function isIosDevice() {
+    return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+}
+
+function isStandaloneMode() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function showInstallBanner() {
+    if (localStorage.getItem(INSTALL_DISMISS_KEY) === 'true') return;
+    if (isStandaloneMode()) return;
+    const banner = document.getElementById('install-banner');
+    if (banner) banner.classList.add('show');
+}
+
+function showIosInstallBanner() {
+    const text = document.getElementById('install-banner-text');
+    const btn = document.getElementById('install-banner-btn');
+    if (text) text.textContent = "Pastdagi Ulashish tugmasini bosib, 'Bosh ekranga qoshish'ni tanlang.";
+    if (btn) btn.style.display = 'none';
+    showInstallBanner();
+}
+
+function dismissInstallBanner() {
+    localStorage.setItem(INSTALL_DISMISS_KEY, 'true');
+    const banner = document.getElementById('install-banner');
+    if (banner) banner.classList.remove('show');
+}
+
+async function installApp() {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    dismissInstallBanner();
+}
+
+window.addEventListener('beforeinstallprompt', function (event) {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    showInstallBanner();
+});
+
+window.addEventListener('appinstalled', function () {
+    dismissInstallBanner();
+});
+
 window.addEventListener('DOMContentLoaded', function() {
     applyTheme(localStorage.getItem(THEME_KEY) || 'light');
     updateNotifSettingsUI();
@@ -1394,6 +1453,10 @@ window.addEventListener('DOMContentLoaded', function() {
     renderChatList();
     renderMessages();
     updateHeader();
+
+    if (isIosDevice() && !isStandaloneMode()) {
+        setTimeout(showIosInstallBanner, 1500);
+    }
 
     if (!IS_LOGGED_IN) {
         const savedUsername = localStorage.getItem('notfic_username');

@@ -394,6 +394,13 @@ def sitemap_xml():
     return app.response_class(content, mimetype='application/xml')
 
 
+@app.route('/sw.js')
+def service_worker():
+    response = app.send_static_file('sw.js')
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
+
+
 @app.route('/auth/google/login')
 def google_login():
     redirect_uri = url_for('google_callback', _external=True)
