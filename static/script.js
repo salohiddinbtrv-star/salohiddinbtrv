@@ -243,9 +243,15 @@ function savePublicHistory(list) {
 }
 
 /* ---------- EKRANGA CHIQARISH ---------- */
+function playChatSwitchAnimation() {
+    messagesBox.classList.remove('chat-switch-in');
+    void messagesBox.offsetWidth;
+    messagesBox.classList.add('chat-switch-in');
+}
+
 function renderMessages() {
     const activeId = getActiveChatId();
-    if (activeId.indexOf('friend_') === 0) return;
+    if (activeId.indexOf('friend_') === 0 || activeId.indexOf('group_') === 0) return;
 
     messagesBox.innerHTML = '';
     lastRenderedKey = null;
@@ -254,6 +260,7 @@ function renderMessages() {
         const history = loadPublicHistory();
         if (history.length === 0) {
             messagesBox.innerHTML = '<div class="empty-state"><h2>Ochiq Suhbat</h2><p>Bu yerga yozgan xabaringizni saytdagi hamma korishi mumkin.</p></div>';
+            playChatSwitchAnimation();
             return;
         }
         history.forEach(function (m) { appendMessageToDOM(m, false); });
@@ -262,12 +269,14 @@ function renderMessages() {
         const chat = chats[activeId];
         if (!chat || chat.messages.length === 0) {
             messagesBox.innerHTML = '<div class="empty-state"><h2>Nima bilan yordam beray?</h2><p>Bu suhbat faqat sizga korinadi.</p></div>';
+            playChatSwitchAnimation();
             return;
         }
         chat.messages.forEach(function (m) { appendMessageToDOM(m, false); });
     }
 
     messagesBox.scrollTop = messagesBox.scrollHeight;
+    playChatSwitchAnimation();
 }
 
 function avatarHtmlFor(data) {
@@ -822,8 +831,9 @@ async function switchToFriend(friendId, friendName, friendAvatar) {
     document.getElementById('public-chat-item').classList.remove('active');
     closeSidebar();
 
-    messagesBox.innerHTML = '<div class="empty-state"><p>Yuklanmoqda...</p></div>';
+    messagesBox.innerHTML = '<div class="loading-spinner-wrap"><div class="loading-spinner"></div></div>';
     lastRenderedKey = null;
+    playChatSwitchAnimation();
 
     try {
         const res = await fetch('/api/friends/' + friendId + '/messages');
@@ -858,11 +868,12 @@ async function switchToFriend(friendId, friendName, friendAvatar) {
 let cachedGroupsList = [];
 let selectedGroupMemberIds = new Set();
 
-function openGroupsModal() {
+async function openGroupsModal() {
     document.getElementById('groups-modal').classList.add('open');
     closeSidebar();
-    loadGroupsListModal();
+    await loadFriendsListModal();
     renderGroupMemberPicker();
+    loadGroupsListModal();
 }
 
 function closeGroupsModal() {
@@ -979,8 +990,9 @@ async function switchToGroup(groupId, groupName) {
     document.getElementById('public-chat-item').classList.remove('active');
     closeSidebar();
 
-    messagesBox.innerHTML = '<div class="empty-state"><p>Yuklanmoqda...</p></div>';
+    messagesBox.innerHTML = '<div class="loading-spinner-wrap"><div class="loading-spinner"></div></div>';
     lastRenderedKey = null;
+    playChatSwitchAnimation();
 
     try {
         const res = await fetch('/api/groups/' + groupId + '/messages');
@@ -1379,6 +1391,332 @@ function updateAvatarImages(url) {
 }
 
 /* ---------- BOSHLANG'ICH YUKLASH ---------- */
+/* ---------- NEYRON TARMOQ FONI (imzo elementi) ---------- */
+function initNeuralBackground() {
+    const canvas = document.getElementById('neural-bg');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const DOT_COUNT = 22;
+    const dpr = window.devicePixelRatio || 1;
+    let width = 0;
+    let height = 0;
+    let dots = [];
+
+    function resize() {
+        width = canvas.offsetWidth * dpr;
+        height = canvas.offsetHeight * dpr;
+        canvas.width = width;
+        canvas.height = height;
+    }
+
+    function initDots() {
+        dots = [];
+        for (let i = 0; i < DOT_COUNT; i++) {
+            dots.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                vx: (Math.random() - 0.5) * 0.15 * dpr,
+                vy: (Math.random() - 0.5) * 0.15 * dpr
+            });
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+        const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#8B6BFF';
+        const maxDist = 120 * dpr;
+
+        for (let i = 0; i < dots.length; i++) {
+            const a = dots[i];
+            if (!reduceMotion) {
+                a.x += a.vx;
+                a.y += a.vy;
+                if (a.x < 0 || a.x > width) a.vx *= -1;
+                if (a.y < 0 || a.y > height) a.vy *= -1;
+            }
+            for (let j = i + 1; j < dots.length; j++) {
+                const b = dots[j];
+                const dx = a.x - b.x;
+                const dy = a.y - b.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < maxDist) {
+                    ctx.strokeStyle = accent;
+                    ctx.globalAlpha = (1 - dist / maxDist) * 0.16;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(b.x, b.y);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = accent;
+        dots.forEach(function (d) {
+            ctx.beginPath();
+            ctx.arc(d.x, d.y, 1.6 * dpr, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function loop() {
+        draw();
+        if (!reduceMotion) requestAnimationFrame(loop);
+    }
+
+    resize();
+    initDots();
+    loop();
+
+    window.addEventListener('resize', function () {
+        resize();
+        initDots();
+        if (reduceMotion) draw();
+    });
+}
+
+/* ---------- YANGILIKLAR (E'LONLAR) ---------- */
+const ANNOUNCEMENT_SEEN_KEY = 'notfic_last_seen_announcement_id';
+
+function openAnnouncementsModal() {
+    document.getElementById('announcements-modal').classList.add('open');
+    closeSidebar();
+    loadAnnouncements();
+}
+
+function closeAnnouncementsModal() {
+    document.getElementById('announcements-modal').classList.remove('open');
+}
+
+function updateAnnouncementBadge(count) {
+    const badge = document.getElementById('announcement-badge');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+async function loadAnnouncements() {
+    try {
+        const res = await fetch('/api/announcements');
+        const items = await res.json();
+        const el = document.getElementById('announcements-list');
+
+        if (el) {
+            if (items.length === 0) {
+                el.innerHTML = '<div class="sidebar-empty">Hali yangiliklar yoq</div>';
+            } else {
+                el.innerHTML = items.map(function (a) {
+                    return '<div class="announcement-item">' +
+                        (a.title ? '<strong>' + escapeHtml(a.title) + '</strong>' : '') +
+                        '<p>' + escapeHtml(a.message) + '</p>' +
+                        '<span class="announcement-time">' + a.time + '</span>' +
+                        '</div>';
+                }).join('');
+            }
+        }
+
+        if (items.length > 0) {
+            localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, items[0].id);
+        }
+        updateAnnouncementBadge(0);
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function checkUnseenAnnouncements() {
+    try {
+        const res = await fetch('/api/announcements');
+        const items = await res.json();
+        if (items.length === 0) return;
+
+        const lastSeen = parseInt(localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) || '0', 10);
+        const unseenCount = items.filter(function (a) { return a.id > lastSeen; }).length;
+        updateAnnouncementBadge(unseenCount);
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+socket.on('announcement_created', function (data) {
+    showNotificationToast((data.title ? data.title + ': ' : '') + data.message.slice(0, 60));
+    showBrowserNotification('Notfic yangiligi', data.message.slice(0, 100));
+    checkUnseenAnnouncements();
+});
+
+/* ---------- KUNLIK AI FIKRI ---------- */
+const QUOTE_SEEN_KEY = 'notfic_quote_seen_date';
+
+function todayDateStr() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+async function maybeShowDailyQuote() {
+    if (localStorage.getItem(QUOTE_SEEN_KEY) === todayDateStr()) return;
+
+    try {
+        const res = await fetch('/api/daily-quote');
+        const data = await res.json();
+        if (!data.text) return;
+
+        const card = document.getElementById('daily-quote-card');
+        const textEl = document.getElementById('daily-quote-text');
+        if (card && textEl) {
+            textEl.textContent = data.text;
+            card.classList.add('show');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function dismissDailyQuote() {
+    localStorage.setItem(QUOTE_SEEN_KEY, todayDateStr());
+    const card = document.getElementById('daily-quote-card');
+    if (card) card.classList.remove('show');
+}
+
+/* ---------- KETMA-KETLIK (STREAK) TABRIGI ---------- */
+const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
+
+function checkStreakCelebration() {
+    const streak = parseInt(document.body.getAttribute('data-streak') || '0', 10);
+    if (STREAK_MILESTONES.indexOf(streak) === -1) return;
+
+    const key = 'notfic_streak_celebrated_' + streak;
+    if (localStorage.getItem(key) === 'true') return;
+    localStorage.setItem(key, 'true');
+
+    showStreakCelebration(streak);
+}
+
+function showStreakCelebration(streak) {
+    const overlay = document.createElement('div');
+    overlay.className = 'streak-celebration-overlay';
+    overlay.innerHTML =
+        '<div class="streak-celebration-mascot">' +
+            '<div class="mascot-antenna"></div>' +
+            '<div class="mascot-head"><div class="mascot-eye"></div><div class="mascot-eye"></div></div>' +
+        '</div>' +
+        '<div class="streak-celebration-bubble">' +
+            '<p>🔥 ' + streak + ' kunlik ketma-ketlik! Har kuni kelib turganingiz uchun rahmat, davom eting!</p>' +
+            '<button class="onboarding-next-btn" onclick="this.closest(\'.streak-celebration-overlay\').remove()">Rahmat!</button>' +
+        '</div>';
+    document.body.appendChild(overlay);
+
+    speakOnboardingText(streak + ' kunlik ketma-ketlik! Har kuni kelib turganingiz uchun rahmat, davom eting!');
+
+    setTimeout(function () {
+        if (overlay.parentNode) overlay.remove();
+    }, 8000);
+}
+
+/* ---------- BIRINCHI KIRISH — AI YORDAMCHISI TANISHTIRUVI ---------- */
+const ONBOARDING_STEPS = [
+    "Salom! Men Notfic sun'iy intellektiman. Hozir sizga ilovani qisqacha tanishtiraman.",
+    "Pastdagi maydonchaga yozib, men bilan istalgan mavzuda suhbatlashishingiz mumkin.",
+    "Chap tomondagi \"Dostlar\" bolimidan dostlaringizni topib, ular bilan alohida yozishasiz. Suhbatda meni @AI deb chaqirsangiz, men ham qoshilaman.",
+    "\"Guruhlar\" bolimida bir nechta dost bilan birga suhbat qurishingiz mumkin.",
+    "Savol yoki muammo bolsa, ong yuqoridagi qalqon tugmasi orqali administratorga murojaat qiling.",
+    "Boshladik! Notfic'dan yaxshi foydalaning."
+];
+
+let onboardingStepIndex = 0;
+
+function renderOnboardingDots() {
+    const el = document.getElementById('onboarding-step-dots');
+    if (!el) return;
+    el.innerHTML = ONBOARDING_STEPS.map(function (_, i) {
+        return '<span class="' + (i === onboardingStepIndex ? 'active' : '') + '"></span>';
+    }).join('');
+}
+
+function speakOnboardingText(text) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'uz-UZ';
+    utterance.rate = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const uzVoice = voices.find(function (v) { return v.lang && v.lang.toLowerCase().indexOf('uz') === 0; });
+    const ruVoice = voices.find(function (v) { return v.lang && v.lang.toLowerCase().indexOf('ru') === 0; });
+    if (uzVoice) utterance.voice = uzVoice;
+    else if (ruVoice) utterance.voice = ruVoice;
+
+    window.speechSynthesis.speak(utterance);
+}
+
+function renderOnboardingStep() {
+    const textEl = document.getElementById('onboarding-text');
+    const nextBtn = document.getElementById('onboarding-next-btn');
+    if (!textEl) return;
+
+    const text = ONBOARDING_STEPS[onboardingStepIndex];
+    textEl.textContent = text;
+    renderOnboardingDots();
+    speakOnboardingText(text);
+
+    if (nextBtn) {
+        nextBtn.textContent = (onboardingStepIndex === ONBOARDING_STEPS.length - 1) ? 'Boshlash' : 'Keyingisi';
+    }
+}
+
+function onboardingNext() {
+    if (onboardingStepIndex < ONBOARDING_STEPS.length - 1) {
+        onboardingStepIndex++;
+        renderOnboardingStep();
+    } else {
+        finishOnboarding();
+    }
+}
+
+function skipOnboarding() {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    finishOnboarding();
+}
+
+async function finishOnboarding() {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+    const overlay = document.getElementById('onboarding-overlay');
+    if (overlay) {
+        overlay.classList.add('closing');
+        setTimeout(function () { overlay.remove(); }, 250);
+    }
+
+    try {
+        await fetch('/api/onboarding/seen', { method: 'POST' });
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const overlay = document.getElementById('onboarding-overlay');
+    if (!overlay) return;
+
+    if (!isStandaloneMode()) {
+        overlay.remove();
+        return;
+    }
+
+    renderOnboardingStep();
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = function () {};
+    }
+});
+
 /* ---------- PWA: ILOVA SIFATIDA O'RNATISH ---------- */
 const INSTALL_DISMISS_KEY = 'notfic_install_dismissed';
 let deferredInstallPrompt = null;
@@ -1399,19 +1737,30 @@ function isStandaloneMode() {
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
+function updateInstallBannerContent() {
+    const text = document.getElementById('install-banner-text');
+    const btn = document.getElementById('install-banner-btn');
+    if (!text || !btn) return;
+
+    if (isIosDevice()) {
+        text.textContent = "Pastdagi Ulashish tugmasini bosib, 'Bosh ekranga qoshish'ni tanlang.";
+        btn.style.display = 'none';
+    } else if (deferredInstallPrompt) {
+        text.textContent = "Tezroq va qulayroq foydalanish uchun ilovani ornating.";
+        btn.style.display = 'inline-flex';
+        btn.onclick = installApp;
+    } else {
+        text.textContent = "Brauzer menyusi (⋮) dan \"Ilovani ornatish\" yoki \"Bosh ekranga qoshish\"ni tanlang.";
+        btn.style.display = 'none';
+    }
+}
+
 function showInstallBanner() {
     if (localStorage.getItem(INSTALL_DISMISS_KEY) === 'true') return;
     if (isStandaloneMode()) return;
+    updateInstallBannerContent();
     const banner = document.getElementById('install-banner');
     if (banner) banner.classList.add('show');
-}
-
-function showIosInstallBanner() {
-    const text = document.getElementById('install-banner-text');
-    const btn = document.getElementById('install-banner-btn');
-    if (text) text.textContent = "Pastdagi Ulashish tugmasini bosib, 'Bosh ekranga qoshish'ni tanlang.";
-    if (btn) btn.style.display = 'none';
-    showInstallBanner();
 }
 
 function dismissInstallBanner() {
@@ -1431,7 +1780,7 @@ async function installApp() {
 window.addEventListener('beforeinstallprompt', function (event) {
     event.preventDefault();
     deferredInstallPrompt = event;
-    showInstallBanner();
+    updateInstallBannerContent();
 });
 
 window.addEventListener('appinstalled', function () {
@@ -1440,6 +1789,7 @@ window.addEventListener('appinstalled', function () {
 
 window.addEventListener('DOMContentLoaded', function() {
     applyTheme(localStorage.getItem(THEME_KEY) || 'light');
+    initNeuralBackground();
     updateNotifSettingsUI();
 
     const chats = loadChats();
@@ -1454,9 +1804,10 @@ window.addEventListener('DOMContentLoaded', function() {
     renderMessages();
     updateHeader();
 
-    if (isIosDevice() && !isStandaloneMode()) {
-        setTimeout(showIosInstallBanner, 1500);
-    }
+    setTimeout(showInstallBanner, 1500);
+    checkUnseenAnnouncements();
+    setTimeout(maybeShowDailyQuote, 800);
+    checkStreakCelebration();
 
     if (!IS_LOGGED_IN) {
         const savedUsername = localStorage.getItem('notfic_username');

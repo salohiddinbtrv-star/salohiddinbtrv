@@ -1,12 +1,13 @@
 :root {
-    --bg: #FAFAF8;
+    --bg: #F6F5FC;
     --panel: #FFFFFF;
-    --ink: #1F1E1D;
-    --ink-soft: #83807A;
-    --border: #E8E5DE;
-    --accent: #C15F3C;
+    --ink: #15162B;
+    --ink-soft: #6C6E8A;
+    --border: #E4E2F5;
+    --accent: #6D4FFF;
     --ok: #4CAF6D;
     --err: #D64545;
+    --font-display: 'Space Grotesk', 'Inter', sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,8 +41,9 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-family: var(--font-display);
     font-weight: 600;
-    font-size: 17px;
+    font-size: 18px;
     margin-bottom: 24px;
 }
 
@@ -104,8 +106,9 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-family: var(--font-display);
     font-weight: 600;
-    font-size: 15px;
+    font-size: 16px;
 }
 
 .logout-btn {

@@ -86,6 +86,9 @@ class User(db.Model):
     custom_avatar = db.Column(db.Text, nullable=True)
     bio = db.Column(db.String(300), default='')
     is_banned = db.Column(db.Boolean, default=False)
+    onboarding_seen = db.Column(db.Boolean, default=False)
+    streak_count = db.Column(db.Integer, default=0)
+    last_active_date = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -141,6 +144,22 @@ class SupportTicket(db.Model):
     email = db.Column(db.String(150))
     message = db.Column(db.Text)
     status = db.Column(db.String(20), default='open')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Announcement(db.Model):
+    __tablename__ = 'announcements'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150))
+    message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class DailyQuote(db.Model):
+    __tablename__ = 'daily_quotes'
+    id = db.Column(db.Integer, primary_key=True)
+    quote_date = db.Column(db.Date, unique=True, nullable=False)
+    text = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -299,6 +318,47 @@ def get_display_avatar(user):
     return user.avatar
 
 
+def update_user_streak(user):
+    """Foydalanuvchi kunlik faollik ketma-ketligini (streak) yangilaydi."""
+    today = datetime.utcnow().date()
+
+    if user.last_active_date == today:
+        return
+
+    if user.last_active_date == today - timedelta(days=1):
+        user.streak_count = (user.streak_count or 0) + 1
+    else:
+        user.streak_count = 1
+
+    user.last_active_date = today
+    db.session.commit()
+
+
+def get_or_create_daily_quote():
+    """Har kunga bitta AI tomonidan yaratilgan qisqa fikr — butun sayt uchun bir marta generatsiya qilinadi."""
+    today = datetime.utcnow().date()
+    existing = DailyQuote.query.filter_by(quote_date=today).first()
+    if existing:
+        return existing.text
+
+    text = get_ai_response(
+        "Bugungi kun uchun ozbek tilida, 20 sozdan oshmagan, ilhomlantiruvchi yoki foydali qisqa fikr yoz. "
+        "Faqat fikrning ozini yoz, kirish yoki izohsiz."
+    )
+
+    quote = DailyQuote(quote_date=today, text=text.strip())
+    db.session.add(quote)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        existing = DailyQuote.query.filter_by(quote_date=today).first()
+        if existing:
+            return existing.text
+
+    return text.strip()
+
+
 def is_admin_user(user):
     if not user or not ADMIN_EMAIL:
         return False
@@ -360,10 +420,14 @@ def get_group_ids_for_user(user_id):
 @app.route('/')
 def index():
     user = current_user()
+    if user:
+        update_user_streak(user)
     display_avatar = get_display_avatar(user) if user else None
     is_admin = is_admin_user(user)
+    show_onboarding = bool(user and not user.onboarding_seen)
     return render_template('index.html', user=user, display_avatar=display_avatar,
-                            anon_limit=ANONYMOUS_MESSAGE_LIMIT, is_admin=is_admin)
+                            anon_limit=ANONYMOUS_MESSAGE_LIMIT, is_admin=is_admin,
+                            show_onboarding=show_onboarding)
 
 
 @app.route('/health')
@@ -869,6 +933,32 @@ def api_submit_support():
     return jsonify({"success": True})
 
 
+@app.route('/api/onboarding/seen', methods=['POST'])
+@login_required_api
+def api_onboarding_seen():
+    user = current_user()
+    user.onboarding_seen = True
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@app.route('/api/announcements')
+def api_announcements():
+    items = Announcement.query.order_by(Announcement.created_at.desc()).limit(50).all()
+    return jsonify([{
+        "id": a.id,
+        "title": a.title,
+        "message": a.message,
+        "time": a.created_at.strftime("%Y-%m-%d %H:%M")
+    } for a in items])
+
+
+@app.route('/api/daily-quote')
+def api_daily_quote():
+    text = get_or_create_daily_quote()
+    return jsonify({"text": text, "date": datetime.utcnow().strftime("%Y-%m-%d")})
+
+
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     error = None
@@ -981,6 +1071,7 @@ def admin_friends_overview():
 def admin_broadcast():
     data = request.get_json() or {}
     text = (data.get('message') or '').strip()[:500]
+    title = (data.get('title') or '').strip()[:150]
 
     if not text:
         return jsonify({"error": "empty_message"}), 400
@@ -996,7 +1087,17 @@ def admin_broadcast():
     }
     public_history.append(entry)
 
+    announcement = Announcement(title=title or None, message=text)
+    db.session.add(announcement)
+    db.session.commit()
+
     socketio.emit('public_response_message', entry)
+    socketio.emit('announcement_created', {
+        "id": announcement.id,
+        "title": announcement.title,
+        "message": announcement.message,
+        "time": announcement.created_at.strftime("%Y-%m-%d %H:%M")
+    })
 
     logger.info(f"Admin elon yubordi: {text}")
     log_admin_action("broadcast", text[:200])

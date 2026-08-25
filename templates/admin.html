@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel — Notfic</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/admin.css">
 </head>
 <body>
@@ -75,7 +75,8 @@
 
             <section class="history-section">
                 <h2>📢 Ommaviy e'lon yuborish</h2>
-                <p class="section-hint">Bu xabar barcha foydalanuvchilarga Ochiq Suhbatda darhol korinadi.</p>
+                <p class="section-hint">Ochiq Suhbatda darhol korinadi va "Yangiliklar" bolimida doimiy saqlanadi.</p>
+                <input type="text" id="broadcast-title-input" class="user-search-input" placeholder="Sarlavha (ixtiyoriy)" maxlength="150">
                 <div class="broadcast-form">
                     <input type="text" id="broadcast-input" class="user-search-input" placeholder="E'lon matnini yozing..." maxlength="500">
                     <button class="broadcast-btn" onclick="sendBroadcast()">Yuborish</button>
@@ -180,6 +181,7 @@
         }
 
         async function sendBroadcast() {
+            const titleInput = document.getElementById('broadcast-title-input');
             const input = document.getElementById('broadcast-input');
             const statusEl = document.getElementById('broadcast-status');
             const text = input.value.trim();
@@ -190,12 +192,13 @@
                 const res = await fetch('/admin/api/broadcast', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
+                    body: JSON.stringify({ message: text, title: titleInput.value.trim() })
                 });
                 const data = await res.json();
                 if (data.success) {
                     statusEl.textContent = 'Yuborildi ✓';
                     input.value = '';
+                    titleInput.value = '';
                     loadAuditLog();
                     setTimeout(function () { statusEl.textContent = ''; }, 2000);
                 } else {
