@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-title" content="Notfic">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v={{ v }}">
 </head>
 <body data-logged-in="{{ 'true' if user else 'false' }}" data-anon-limit="{{ anon_limit }}" data-streak="{{ user.streak_count if user and user.streak_count else 0 }}">
 
@@ -75,6 +75,31 @@
             <button class="new-chat-btn" onclick="openGroupsModal()">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M17 20v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M10 10a4 4 0 100-8 4 4 0 000 8zM23 20v-2a4 4 0 00-3-3.87M17.5 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 Guruhlar
+            </button>
+
+            <button class="new-chat-btn" onclick="openTasksModal()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Vazifalar
+            </button>
+
+            <button class="new-chat-btn" onclick="openSavedModal()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                Saqlanganlar
+            </button>
+
+            <button class="new-chat-btn" onclick="openActivityModal()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 12h4l3 8 4-16 3 8h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Faoliyatim
+            </button>
+
+            <button class="new-chat-btn" onclick="openThemesModal()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 3a9 9 0 000 18c1.5 0 2-1 2-2s-.5-1.5-.5-2.5S14 15 15 15h2a4 4 0 004-4c0-4.4-4-8-9-8z" stroke="currentColor" stroke-width="1.6"/></svg>
+                Mavzular
+            </button>
+
+            <button class="new-chat-btn" onclick="openQuickPromptsModal()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                Tezkor buyruqlar
             </button>
             {% endif %}
 
@@ -284,6 +309,79 @@
     </div>
     {% endif %}
 
+    <!-- VAZIFALAR MODALI -->
+    {% if user %}
+    <div id="tasks-modal" class="modal-overlay" onclick="if(event.target===this) closeTasksModal()">
+        <div class="modal friends-modal-box">
+            <div class="modal-header">
+                <h3>✅ Vazifalar</h3>
+                <button class="modal-close" onclick="closeTasksModal()">X</button>
+            </div>
+            <div class="task-add-row">
+                <input type="text" id="task-input" class="profile-field-input" placeholder="Yangi vazifa qoshish..." maxlength="300" onkeypress="if(event.key==='Enter') addTask()">
+                <button class="task-add-btn" onclick="addTask()">+</button>
+            </div>
+            <div id="tasks-list" class="tasks-list"></div>
+        </div>
+    </div>
+
+    <!-- SAQLANGANLAR MODALI -->
+    <div id="saved-modal" class="modal-overlay" onclick="if(event.target===this) closeSavedModal()">
+        <div class="modal friends-modal-box">
+            <div class="modal-header">
+                <h3>🔖 Saqlangan xabarlar</h3>
+                <button class="modal-close" onclick="closeSavedModal()">X</button>
+            </div>
+            <p class="section-hint-light">AI javoblarida 🔖 belgisini bosib, xabarni shu yerga saqlashingiz mumkin.</p>
+            <div id="saved-list" class="tasks-list"></div>
+        </div>
+    </div>
+
+    <!-- FAOLIYATIM MODALI -->
+    <div id="activity-modal" class="modal-overlay" onclick="if(event.target===this) closeActivityModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>📊 Faoliyatim</h3>
+                <button class="modal-close" onclick="closeActivityModal()">X</button>
+            </div>
+            <div id="activity-content" class="activity-content"></div>
+        </div>
+    </div>
+
+    <!-- MAVZULAR MODALI -->
+    <div id="themes-modal" class="modal-overlay" onclick="if(event.target===this) closeThemesModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>🎨 Mavzular</h3>
+                <button class="modal-close" onclick="closeThemesModal()">X</button>
+            </div>
+            <div class="modal-row">
+                <span>Yorug'lik rejimi</span>
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="theme-label-2">Och rang</span>
+                </button>
+            </div>
+            <div class="friends-section-title">Rang sxemasi</div>
+            <div class="accent-swatch-row">
+                <button class="accent-swatch" data-accent="violet" onclick="setAccentTheme('violet')" style="background:linear-gradient(135deg,#6D4FFF,#06B6D4)"></button>
+                <button class="accent-swatch" data-accent="rose" onclick="setAccentTheme('rose')" style="background:linear-gradient(135deg,#FF5C8A,#FFB86B)"></button>
+                <button class="accent-swatch" data-accent="emerald" onclick="setAccentTheme('emerald')" style="background:linear-gradient(135deg,#10B981,#84CC16)"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TEZKOR BUYRUQLAR MODALI -->
+    <div id="quick-prompts-modal" class="modal-overlay" onclick="if(event.target===this) closeQuickPromptsModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>⚡ Tezkor buyruqlar</h3>
+                <button class="modal-close" onclick="closeQuickPromptsModal()">X</button>
+            </div>
+            <div id="quick-prompts-list" class="quick-prompts-list"></div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- YANGILIKLAR MODALI -->
     <div id="announcements-modal" class="modal-overlay" onclick="if(event.target===this) closeAnnouncementsModal()">
         <div class="modal">
@@ -397,7 +495,7 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="/static/script.js"></script>
+    <script src="/static/script.js?v={{ v }}"></script>
 
 </body>
-</html>s
+</html>

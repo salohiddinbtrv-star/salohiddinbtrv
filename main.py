@@ -72,7 +72,9 @@ google = oauth.register(
 
 SYSTEM_PROMPT = (
     "Sening isming Notfic. Sen Notfic platformasining aqlli yordamchisisan. "
-    "Do'stona, qisqa, tushunarli va aqlli javob ber."
+    "Do'stona, qisqa, tushunarli va aqlli javob ber. "
+    "Agar kimdir seni kim yaratgani, kimning loyihasi ekanligi yoki muallifing haqida sorasa, "
+    "Notfic platformasini Salohiddin Botirov yaratganini ayt."
 )
 
 
@@ -163,6 +165,23 @@ class DailyQuote(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class Task(db.Model):
+    __tablename__ = 'tasks'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    text = db.Column(db.String(300))
+    is_done = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class SavedMessage(db.Model):
+    __tablename__ = 'saved_messages'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    content = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class AIFeedback(db.Model):
     __tablename__ = 'ai_feedback'
     id = db.Column(db.Integer, primary_key=True)
@@ -197,6 +216,7 @@ with app.app_context():
 
 
 SERVER_START_TIME = datetime.utcnow()
+STATIC_VERSION = str(int(SERVER_START_TIME.timestamp()))
 connected_sids = set()
 stats = {
     "total_public_messages": 0,
@@ -417,6 +437,15 @@ def get_group_ids_for_user(user_id):
     return [m.group_id for m in GroupMember.query.filter_by(user_id=user_id).all()]
 
 
+@app.after_request
+def add_no_cache_headers(response):
+    if response.mimetype == 'text/html':
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
+
 @app.route('/')
 def index():
     user = current_user()
@@ -427,7 +456,7 @@ def index():
     show_onboarding = bool(user and not user.onboarding_seen)
     return render_template('index.html', user=user, display_avatar=display_avatar,
                             anon_limit=ANONYMOUS_MESSAGE_LIMIT, is_admin=is_admin,
-                            show_onboarding=show_onboarding)
+                            show_onboarding=show_onboarding, v=STATIC_VERSION)
 
 
 @app.route('/health')
@@ -959,6 +988,127 @@ def api_daily_quote():
     return jsonify({"text": text, "date": datetime.utcnow().strftime("%Y-%m-%d")})
 
 
+@app.route('/api/tasks', methods=['GET'])
+@login_required_api
+def api_list_tasks():
+    user = current_user()
+    tasks = Task.query.filter_by(user_id=user.id).order_by(Task.created_at.asc()).all()
+    return jsonify([{
+        "id": t.id, "text": t.text, "is_done": t.is_done
+    } for t in tasks])
+
+
+@app.route('/api/tasks', methods=['POST'])
+@login_required_api
+def api_create_task():
+    user = current_user()
+    data = request.get_json() or {}
+    text = (data.get('text') or '').strip()[:300]
+    if not text:
+        return jsonify({"error": "empty_text"}), 400
+
+    task = Task(user_id=user.id, text=text)
+    db.session.add(task)
+    db.session.commit()
+    return jsonify({"success": True, "id": task.id, "text": task.text, "is_done": False})
+
+
+@app.route('/api/tasks/<int:task_id>/toggle', methods=['POST'])
+@login_required_api
+def api_toggle_task(task_id):
+    user = current_user()
+    task = db.session.get(Task, task_id)
+    if not task or task.user_id != user.id:
+        return jsonify({"error": "not_found"}), 404
+    task.is_done = not task.is_done
+    db.session.commit()
+    return jsonify({"success": True, "is_done": task.is_done})
+
+
+@app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+@login_required_api
+def api_delete_task(task_id):
+    user = current_user()
+    task = db.session.get(Task, task_id)
+    if not task or task.user_id != user.id:
+        return jsonify({"error": "not_found"}), 404
+    db.session.delete(task)
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@app.route('/api/saved-messages', methods=['GET'])
+@login_required_api
+def api_list_saved_messages():
+    user = current_user()
+    items = SavedMessage.query.filter_by(user_id=user.id).order_by(SavedMessage.created_at.desc()).all()
+    return jsonify([{
+        "id": s.id, "content": s.content, "time": s.created_at.strftime("%Y-%m-%d %H:%M")
+    } for s in items])
+
+
+@app.route('/api/saved-messages', methods=['POST'])
+@login_required_api
+def api_create_saved_message():
+    user = current_user()
+    data = request.get_json() or {}
+    content = (data.get('content') or '').strip()[:4000]
+    if not content:
+        return jsonify({"error": "empty_content"}), 400
+
+    saved = SavedMessage(user_id=user.id, content=content)
+    db.session.add(saved)
+    db.session.commit()
+    return jsonify({"success": True, "id": saved.id})
+
+
+@app.route('/api/saved-messages/<int:saved_id>', methods=['DELETE'])
+@login_required_api
+def api_delete_saved_message(saved_id):
+    user = current_user()
+    saved = db.session.get(SavedMessage, saved_id)
+    if not saved or saved.user_id != user.id:
+        return jsonify({"error": "not_found"}), 404
+    db.session.delete(saved)
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@app.route('/api/my-activity')
+@login_required_api
+def api_my_activity():
+    user = current_user()
+
+    dm_count = DirectMessage.query.filter_by(sender_id=user.id).count()
+    group_msg_count = GroupMessage.query.filter_by(sender_id=user.id, is_ai=False).count()
+    friends_count = FriendRequest.query.filter(
+        db.or_(FriendRequest.sender_id == user.id, FriendRequest.receiver_id == user.id),
+        FriendRequest.status == 'accepted'
+    ).count()
+    groups_count = GroupMember.query.filter_by(user_id=user.id).count()
+
+    return jsonify({
+        "streak_count": user.streak_count or 0,
+        "joined_date": user.created_at.strftime("%Y-%m-%d") if user.created_at else '',
+        "friend_messages_sent": dm_count,
+        "group_messages_sent": group_msg_count,
+        "friends_count": friends_count,
+        "groups_count": groups_count
+    })
+
+
+@app.route('/api/quick-prompts')
+def api_quick_prompts():
+    return jsonify([
+        {"label": "😂 Hazil ayt", "prompt": "Menga qiziqarli va kulgili hazil ayt."},
+        {"label": "💡 Fikr ber", "prompt": "Bugungi kun uchun foydali maslahat ber."},
+        {"label": "📚 Tushuntir", "prompt": "Menga murakkab mavzuni sodda tilda tushuntirib ber."},
+        {"label": "💻 Kod yordami", "prompt": "Menga dasturlashda yordam kerak."},
+        {"label": "✍️ Matn yoz", "prompt": "Menga qisqa va tasirli matn yozib ber."},
+        {"label": "🎯 Motivatsiya", "prompt": "Menga bugun uchun motivatsion soz ayt."}
+    ])
+
+
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     error = None
@@ -1012,7 +1162,8 @@ def admin_dashboard():
         total_users=total_users,
         uptime=f"{hours} soat {minutes} daqiqa",
         ai_connected=ai_client is not None,
-        history=list(public_history)[::-1]
+        history=list(public_history)[::-1],
+        v=STATIC_VERSION
     )
 
 
