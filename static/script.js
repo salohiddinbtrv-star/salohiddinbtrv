@@ -1398,32 +1398,32 @@ let commandPaletteFiltered = [];
 
 function buildCommandPaletteItems() {
     const items = [
-        { icon: '🤖', label: 'Yangi AI suhbat', keywords: 'ai suhbat yangi chat', action: function () { newAIChat(); } },
-        { icon: '💬', label: 'Ochiq Suhbat', keywords: 'ochiq suhbat public', action: function () { switchToPublic(); } }
+        { icon: '🤖', label: 'Yangi AI suhbat', keywords: 'ai suhbat yangi chat yangi suhbat boshla', action: function () { newAIChat(); } },
+        { icon: '💬', label: 'Ochiq Suhbat', keywords: 'ochiq suhbat public umumiy suhbat', action: function () { switchToPublic(); } }
     ];
 
     if (IS_LOGGED_IN) {
         items.push(
-            { icon: '👥', label: "Do'stlar", keywords: 'dostlar friends', action: function () { openFriendsModal(); } },
-            { icon: '👨‍👩‍👧', label: 'Guruhlar', keywords: 'guruhlar groups', action: function () { openGroupsModal(); } },
-            { icon: '✅', label: 'Vazifalar', keywords: 'vazifa tasks todo', action: function () { openTasksModal(); } },
-            { icon: '🔖', label: 'Saqlangan xabarlar', keywords: 'saqlangan saved', action: function () { openSavedModal(); } },
-            { icon: '📊', label: 'Faoliyatim', keywords: 'faoliyat activity statistika', action: function () { openActivityModal(); } },
-            { icon: '⚡', label: 'Tezkor buyruqlar', keywords: 'tezkor buyruq prompt', action: function () { openQuickPromptsModal(); } },
-            { icon: '👤', label: 'Profilim', keywords: 'profil', action: function () { openProfile(); } },
-            { icon: '🛡', label: 'Adminga murojaat', keywords: 'admin murojaat support yordam', action: function () { openSupportModal(); } }
+            { icon: '👥', label: "Do'stlar", keywords: 'dostlar dostlarim friends dostim', action: function () { openFriendsModal(); } },
+            { icon: '👨‍👩‍👧', label: 'Guruhlar', keywords: 'guruhlar guruhlarim groups guruh', action: function () { openGroupsModal(); } },
+            { icon: '✅', label: 'Vazifalar', keywords: 'vazifa vazifalar tasks todo eslatma', action: function () { openTasksModal(); } },
+            { icon: '🔖', label: 'Saqlangan xabarlar', keywords: 'saqlangan saqlanganlar saved bukmark', action: function () { openSavedModal(); } },
+            { icon: '📊', label: 'Faoliyatim', keywords: 'faoliyat faoliyatim activity statistika statistikam', action: function () { openActivityModal(); } },
+            { icon: '⚡', label: 'Tezkor buyruqlar', keywords: 'tezkor buyruq prompt tezkor buyruqlar', action: function () { openQuickPromptsModal(); } },
+            { icon: '👤', label: 'Profilim', keywords: 'profil profilim', action: function () { openProfile(); } },
+            { icon: '🛡', label: 'Adminga murojaat', keywords: 'admin murojaat support adminga', action: function () { openSupportModal(); } }
         );
     }
 
     items.push(
-        { icon: '📢', label: 'Yangiliklar', keywords: 'yangilik elon news', action: function () { openAnnouncementsModal(); } },
-        { icon: '📱', label: 'Ilovalar', keywords: 'ilova apps', action: function () { openAppsModal(); } },
-        { icon: '⚙️', label: 'Sozlamalar', keywords: 'sozlama settings', action: function () { openSettings(); } },
-        { icon: '🌗', label: 'Mavzuni almashtirish', keywords: 'mavzu tema rang dark light', action: function () { toggleTheme(); } }
+        { icon: '📢', label: 'Yangiliklar', keywords: 'yangilik yangiliklar elon elonlar news', action: function () { openAnnouncementsModal(); } },
+        { icon: '📱', label: 'Ilovalar', keywords: 'ilova ilovalar apps', action: function () { openAppsModal(); } },
+        { icon: '⚙️', label: 'Sozlamalar', keywords: 'sozlama sozlamalar settings', action: function () { openSettings(); } },
+        { icon: '🌗', label: 'Mavzuni almashtirish', keywords: 'mavzu mavzuni tema rangni almashtir', action: function () { toggleTheme(); } }
     );
 
     if (IS_LOGGED_IN) {
-        items.push({ icon: '🚪', label: 'Chiqish', keywords: 'chiqish logout', action: function () { window.location.href = '/auth/logout'; } });
+        items.push({ icon: '🚪', label: 'Chiqish', keywords: 'chiqish logout hisobdan chiq', action: function () { window.location.href = '/auth/logout'; } });
     }
 
     return items;
@@ -1660,24 +1660,122 @@ function stopVoiceListening() {
     if (mic) mic.classList.remove('listening');
 }
 
-function handleVoiceCommand(transcript) {
-    const text = transcript.toLowerCase();
-    const items = buildCommandPaletteItems();
+const VOICE_WAKE_WORDS = ['hey notfic', 'hey notfik', 'salom notfic', 'e notfic', 'notfic'];
 
+function stripWakeWord(text) {
+    for (let i = 0; i < VOICE_WAKE_WORDS.length; i++) {
+        const w = VOICE_WAKE_WORDS[i];
+        if (text.indexOf(w) === 0) {
+            return text.slice(w.length).trim();
+        }
+    }
+    return text;
+}
+
+function containsWakeWord(text) {
+    for (let i = 0; i < VOICE_WAKE_WORDS.length; i++) {
+        if (text.indexOf(VOICE_WAKE_WORDS[i]) !== -1) return true;
+    }
+    return false;
+}
+
+function handleVoiceCommand(transcript) {
+    let text = transcript.toLowerCase().trim();
+    const hadWakeWord = containsWakeWord(text);
+
+    if (hadWakeWord) {
+        text = stripWakeWord(text);
+    }
+
+    if (hadWakeWord && text.length === 0) {
+        speakOnboardingText('Hey sir! Tinglayapman, buyruq bering.');
+        showNotificationToast('🎙 Hey sir! Tinglayapman...');
+        return;
+    }
+
+    if (!text) return;
+
+    // Tinglashni tokhtatish buyrugi
+    if (/tinglashni tokhtat|ovozni ochir|meni eshitma|sukut/.test(text)) {
+        speakOnboardingText('Xop, tinglashni tokhtataman.');
+        disableVoiceAssistant();
+        return;
+    }
+
+    // Vaqtni aytish
+    if (/soat necha|vaqtni ayt|hozir soat/.test(text)) {
+        const now = new Date();
+        const timeStr = now.getHours() + ' soat ' + now.getMinutes() + ' daqiqa';
+        speakOnboardingText('Hozir soat ' + timeStr);
+        showNotificationToast('🕐 ' + timeStr);
+        return;
+    }
+
+    // Yordam / nima qila olasan
+    if (/nima qila olasan|yordam ber|komandalar|buyruqlar royxati/.test(text)) {
+        const helpText = "Men do'stlar, guruhlar, vazifalar, sozlamalar kabi bolimlarni ochishim, vazifa qoshishim, mavzuni ozgartirishim va sizning xabaringizni AI'ga yuborishim mumkin.";
+        speakOnboardingText(helpText);
+        showNotificationToast('🎙 ' + helpText);
+        return;
+    }
+
+    // Qorongi / yorug rejim
+    if (/qorong[gi]?i? rejim|tun rejimi|qorayt/.test(text)) {
+        applyTheme('dark');
+        speakOnboardingText('Qorongi rejimga otdim.');
+        return;
+    }
+    if (/yorug rejim|kun rejimi|yorit/.test(text)) {
+        applyTheme('light');
+        speakOnboardingText('Yorug rejimga otdim.');
+        return;
+    }
+
+    // Yangi vazifa qoshish: "vazifa qosh ..." yoki "eslatma qosh ..."
+    const taskMatch = text.match(/(?:vazifa|eslatma)(?:ni)?\s*qo['o]?sh\s+(.+)/);
+    if (taskMatch && taskMatch[1]) {
+        const taskText = taskMatch[1].trim();
+        fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: taskText })
+        }).then(function () {
+            speakOnboardingText('Vazifa qoshildi: ' + taskText);
+            showNotificationToast('✅ Vazifa qoshildi: ' + taskText);
+        }).catch(function (e) { console.error(e); });
+        return;
+    }
+
+    // Yangiliklarni ovozda oqish
+    if (/yangiliklarni oqi|songgi yangilik|nima yangilik/.test(text)) {
+        fetch('/api/announcements').then(function (r) { return r.json(); }).then(function (items) {
+            if (items.length === 0) {
+                speakOnboardingText('Hozircha yangiliklar yoq.');
+            } else {
+                speakOnboardingText('Songgi yangilik: ' + items[0].message);
+            }
+        }).catch(function (e) { console.error(e); });
+        return;
+    }
+
+    // Bolim/harakat buyruqlari (Buyruqlar panelidagi royxatdan)
+    const items = buildCommandPaletteItems();
     for (let i = 0; i < items.length; i++) {
         const keywordList = items[i].keywords.split(' ');
         for (let j = 0; j < keywordList.length; j++) {
             if (keywordList[j].length > 2 && text.indexOf(keywordList[j]) !== -1) {
                 showNotificationToast('🎙 Bajarilmoqda: ' + items[i].label);
+                speakOnboardingText(items[i].label + ' ochilmoqda.');
                 items[i].action();
                 return;
             }
         }
     }
 
+    // Hech narsa mos kelmasa — xabar sifatida AI'ga yuboriladi
     const messageInput = document.getElementById('message-input');
     if (messageInput) {
-        messageInput.value = transcript;
+        messageInput.value = text;
         sendMessage();
         showNotificationToast('🎙 Xabar sifatida yuborildi');
     }
