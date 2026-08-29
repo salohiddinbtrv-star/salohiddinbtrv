@@ -1392,6 +1392,306 @@ function updateAvatarImages(url) {
 }
 
 /* ---------- BOSHLANG'ICH YUKLASH ---------- */
+/* ---------- BUYRUQLAR PANELI (Ctrl+K / Cmd+K) ---------- */
+let commandPaletteActiveIndex = 0;
+let commandPaletteFiltered = [];
+
+function buildCommandPaletteItems() {
+    const items = [
+        { icon: '🤖', label: 'Yangi AI suhbat', keywords: 'ai suhbat yangi chat', action: function () { newAIChat(); } },
+        { icon: '💬', label: 'Ochiq Suhbat', keywords: 'ochiq suhbat public', action: function () { switchToPublic(); } }
+    ];
+
+    if (IS_LOGGED_IN) {
+        items.push(
+            { icon: '👥', label: "Do'stlar", keywords: 'dostlar friends', action: function () { openFriendsModal(); } },
+            { icon: '👨‍👩‍👧', label: 'Guruhlar', keywords: 'guruhlar groups', action: function () { openGroupsModal(); } },
+            { icon: '✅', label: 'Vazifalar', keywords: 'vazifa tasks todo', action: function () { openTasksModal(); } },
+            { icon: '🔖', label: 'Saqlangan xabarlar', keywords: 'saqlangan saved', action: function () { openSavedModal(); } },
+            { icon: '📊', label: 'Faoliyatim', keywords: 'faoliyat activity statistika', action: function () { openActivityModal(); } },
+            { icon: '⚡', label: 'Tezkor buyruqlar', keywords: 'tezkor buyruq prompt', action: function () { openQuickPromptsModal(); } },
+            { icon: '👤', label: 'Profilim', keywords: 'profil', action: function () { openProfile(); } },
+            { icon: '🛡', label: 'Adminga murojaat', keywords: 'admin murojaat support yordam', action: function () { openSupportModal(); } }
+        );
+    }
+
+    items.push(
+        { icon: '📢', label: 'Yangiliklar', keywords: 'yangilik elon news', action: function () { openAnnouncementsModal(); } },
+        { icon: '📱', label: 'Ilovalar', keywords: 'ilova apps', action: function () { openAppsModal(); } },
+        { icon: '⚙️', label: 'Sozlamalar', keywords: 'sozlama settings', action: function () { openSettings(); } },
+        { icon: '🌗', label: 'Mavzuni almashtirish', keywords: 'mavzu tema rang dark light', action: function () { toggleTheme(); } }
+    );
+
+    if (IS_LOGGED_IN) {
+        items.push({ icon: '🚪', label: 'Chiqish', keywords: 'chiqish logout', action: function () { window.location.href = '/auth/logout'; } });
+    }
+
+    return items;
+}
+
+function openCommandPalette() {
+    commandPaletteActiveIndex = 0;
+    renderCommandPaletteList('');
+
+    const overlay = document.getElementById('command-palette-overlay');
+    const input = document.getElementById('command-palette-input');
+    if (overlay) overlay.classList.add('open');
+    if (input) {
+        input.value = '';
+        setTimeout(function () { input.focus(); }, 50);
+    }
+}
+
+function closeCommandPalette() {
+    const overlay = document.getElementById('command-palette-overlay');
+    if (overlay) overlay.classList.remove('open');
+}
+
+function renderCommandPaletteList(query) {
+    const list = document.getElementById('command-palette-list');
+    if (!list) return;
+
+    const allItems = buildCommandPaletteItems();
+    const q = query.trim().toLowerCase();
+    commandPaletteFiltered = allItems.filter(function (item) {
+        return item.label.toLowerCase().indexOf(q) !== -1 || item.keywords.indexOf(q) !== -1;
+    });
+
+    if (commandPaletteFiltered.length === 0) {
+        list.innerHTML = '<div class="sidebar-empty">Hech narsa topilmadi</div>';
+        return;
+    }
+
+    commandPaletteActiveIndex = Math.min(commandPaletteActiveIndex, commandPaletteFiltered.length - 1);
+
+    list.innerHTML = commandPaletteFiltered.map(function (item, i) {
+        return '<div class="command-palette-item' + (i === commandPaletteActiveIndex ? ' active' : '') + '" onclick="executeCommandPaletteItem(' + i + ')">' +
+            '<span class="command-palette-icon">' + item.icon + '</span>' +
+            '<span>' + escapeHtml(item.label) + '</span>' +
+            '</div>';
+    }).join('');
+}
+
+function executeCommandPaletteItem(index) {
+    const item = commandPaletteFiltered[index];
+    closeCommandPalette();
+    if (item && item.action) item.action();
+}
+
+document.addEventListener('keydown', function (e) {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const modifierPressed = isMac ? e.metaKey : e.ctrlKey;
+
+    if (modifierPressed && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const overlay = document.getElementById('command-palette-overlay');
+        if (overlay && overlay.classList.contains('open')) {
+            closeCommandPalette();
+        } else {
+            openCommandPalette();
+        }
+        return;
+    }
+
+    const overlay = document.getElementById('command-palette-overlay');
+    if (!overlay || !overlay.classList.contains('open')) return;
+
+    if (e.key === 'Escape') {
+        closeCommandPalette();
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        commandPaletteActiveIndex = Math.min(commandPaletteActiveIndex + 1, commandPaletteFiltered.length - 1);
+        renderCommandPaletteList(document.getElementById('command-palette-input').value);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        commandPaletteActiveIndex = Math.max(commandPaletteActiveIndex - 1, 0);
+        renderCommandPaletteList(document.getElementById('command-palette-input').value);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        executeCommandPaletteItem(commandPaletteActiveIndex);
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const cpInput = document.getElementById('command-palette-input');
+    if (cpInput) {
+        cpInput.addEventListener('input', function () {
+            commandPaletteActiveIndex = 0;
+            renderCommandPaletteList(cpInput.value);
+        });
+    }
+});
+
+/* ---------- KONFETTI ANIMATSIYASI ---------- */
+function fireConfetti() {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'confetti-canvas';
+    document.body.appendChild(canvas);
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+
+    const colors = ['#6D4FFF', '#06B6D4', '#FF5C8A', '#FFB86B', '#10B981'];
+    const particles = [];
+    const originX = window.innerWidth / 2;
+    const originY = window.innerHeight * 0.35;
+
+    for (let i = 0; i < 70; i++) {
+        particles.push({
+            x: originX,
+            y: originY,
+            vx: (Math.random() - 0.5) * 10,
+            vy: Math.random() * -9 - 2,
+            size: Math.random() * 5 + 3,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            rotation: Math.random() * 360,
+            vr: (Math.random() - 0.5) * 12
+        });
+    }
+
+    let frame = 0;
+    function animate() {
+        frame++;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(function (p) {
+            p.vy += 0.28;
+            p.x += p.vx;
+            p.y += p.vy;
+            p.rotation += p.vr;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rotation * Math.PI / 180);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+            ctx.restore();
+        });
+        if (frame < 90) {
+            requestAnimationFrame(animate);
+        } else {
+            canvas.remove();
+        }
+    }
+    animate();
+}
+
+/* ---------- OVOZLI YORDAMCHI (buyruqlarni tinglaydi va bajaradi) ---------- */
+const VOICE_ASSISTANT_KEY = 'notfic_voice_assistant_enabled';
+let voiceRecognition = null;
+let voiceAssistantActive = false;
+let voiceRestartTimer = null;
+
+function isVoiceAssistantSupported() {
+    return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+}
+
+function isVoiceAssistantEnabled() {
+    return localStorage.getItem(VOICE_ASSISTANT_KEY) === 'true';
+}
+
+function updateVoiceAssistantUI() {
+    const label = document.getElementById('voice-assistant-label');
+    const btn = document.getElementById('voice-assistant-toggle-btn');
+    const mic = document.getElementById('voice-mic-btn');
+    if (label) label.textContent = isVoiceAssistantEnabled() ? 'Yoqilgan' : "Ochirilgan";
+    if (btn) btn.onclick = isVoiceAssistantEnabled() ? disableVoiceAssistant : enableVoiceAssistant;
+    if (mic) mic.style.display = isVoiceAssistantEnabled() ? 'flex' : 'none';
+}
+
+function enableVoiceAssistant() {
+    if (!isVoiceAssistantSupported()) {
+        alert("Brauzeringiz ovozli buyruqlarni qollab-quvvatlamaydi. Chrome yoki Edge'dan foydalaning.");
+        return;
+    }
+    localStorage.setItem(VOICE_ASSISTANT_KEY, 'true');
+    updateVoiceAssistantUI();
+    startVoiceListening();
+}
+
+function disableVoiceAssistant() {
+    localStorage.setItem(VOICE_ASSISTANT_KEY, 'false');
+    voiceAssistantActive = false;
+    updateVoiceAssistantUI();
+    stopVoiceListening();
+}
+
+function startVoiceListening() {
+    if (!isVoiceAssistantSupported() || !isVoiceAssistantEnabled()) return;
+    if (voiceAssistantActive) return;
+
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    voiceRecognition = new SpeechRecognitionCtor();
+    voiceRecognition.lang = 'uz-UZ';
+    voiceRecognition.continuous = true;
+    voiceRecognition.interimResults = false;
+
+    voiceRecognition.onresult = function (event) {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim();
+        if (transcript) handleVoiceCommand(transcript);
+    };
+
+    voiceRecognition.onerror = function () {
+        voiceAssistantActive = false;
+    };
+
+    voiceRecognition.onend = function () {
+        voiceAssistantActive = false;
+        if (isVoiceAssistantEnabled() && document.visibilityState === 'visible') {
+            clearTimeout(voiceRestartTimer);
+            voiceRestartTimer = setTimeout(startVoiceListening, 600);
+        }
+    };
+
+    try {
+        voiceRecognition.start();
+        voiceAssistantActive = true;
+        const mic = document.getElementById('voice-mic-btn');
+        if (mic) mic.classList.add('listening');
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function stopVoiceListening() {
+    clearTimeout(voiceRestartTimer);
+    if (voiceRecognition) {
+        try { voiceRecognition.stop(); } catch (e) { /* ignore */ }
+    }
+    const mic = document.getElementById('voice-mic-btn');
+    if (mic) mic.classList.remove('listening');
+}
+
+function handleVoiceCommand(transcript) {
+    const text = transcript.toLowerCase();
+    const items = buildCommandPaletteItems();
+
+    for (let i = 0; i < items.length; i++) {
+        const keywordList = items[i].keywords.split(' ');
+        for (let j = 0; j < keywordList.length; j++) {
+            if (keywordList[j].length > 2 && text.indexOf(keywordList[j]) !== -1) {
+                showNotificationToast('🎙 Bajarilmoqda: ' + items[i].label);
+                items[i].action();
+                return;
+            }
+        }
+    }
+
+    const messageInput = document.getElementById('message-input');
+    if (messageInput) {
+        messageInput.value = transcript;
+        sendMessage();
+        showNotificationToast('🎙 Xabar sifatida yuborildi');
+    }
+}
+
+document.addEventListener('visibilitychange', function () {
+    if (!isVoiceAssistantEnabled()) return;
+    if (document.visibilityState === 'visible') {
+        startVoiceListening();
+    } else {
+        stopVoiceListening();
+    }
+});
+
 /* ---------- NEYRON TARMOQ FONI (imzo elementi) ---------- */
 function initNeuralBackground() {
     const canvas = document.getElementById('neural-bg');
@@ -1538,7 +1838,9 @@ async function addTask() {
 
 async function toggleTask(taskId) {
     try {
-        await fetch('/api/tasks/' + taskId + '/toggle', { method: 'POST' });
+        const res = await fetch('/api/tasks/' + taskId + '/toggle', { method: 'POST' });
+        const data = await res.json();
+        if (data.success && data.is_done) fireConfetti();
         loadTasks();
     } catch (e) {
         console.error(e);
@@ -1833,6 +2135,7 @@ function showStreakCelebration(streak) {
             '<button class="onboarding-next-btn" onclick="this.closest(\'.streak-celebration-overlay\').remove()">Rahmat!</button>' +
         '</div>';
     document.body.appendChild(overlay);
+    fireConfetti();
 
     speakOnboardingText(streak + ' kunlik ketma-ketlik! Har kuni kelib turganingiz uchun rahmat, davom eting!');
 
@@ -2012,6 +2315,8 @@ window.addEventListener('DOMContentLoaded', function() {
     applyTheme(localStorage.getItem(THEME_KEY) || 'light');
     applyStoredAccent();
     initNeuralBackground();
+    updateVoiceAssistantUI();
+    if (isVoiceAssistantEnabled()) startVoiceListening();
     updateNotifSettingsUI();
 
     const chats = loadChats();
