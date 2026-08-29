@@ -76,31 +76,6 @@
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M17 20v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M10 10a4 4 0 100-8 4 4 0 000 8zM23 20v-2a4 4 0 00-3-3.87M17.5 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 Guruhlar
             </button>
-
-            <button class="new-chat-btn" onclick="openTasksModal()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Vazifalar
-            </button>
-
-            <button class="new-chat-btn" onclick="openSavedModal()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-                Saqlanganlar
-            </button>
-
-            <button class="new-chat-btn" onclick="openActivityModal()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 12h4l3 8 4-16 3 8h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Faoliyatim
-            </button>
-
-            <button class="new-chat-btn" onclick="openThemesModal()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 3a9 9 0 000 18c1.5 0 2-1 2-2s-.5-1.5-.5-2.5S14 15 15 15h2a4 4 0 004-4c0-4.4-4-8-9-8z" stroke="currentColor" stroke-width="1.6"/></svg>
-                Mavzular
-            </button>
-
-            <button class="new-chat-btn" onclick="openQuickPromptsModal()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-                Tezkor buyruqlar
-            </button>
             {% endif %}
 
             <div class="sidebar-footer">
@@ -189,6 +164,30 @@
                     <span id="notif-toggle-label">Ochirilgan</span>
                 </button>
             </div>
+
+            <div class="friends-section-title">Rang sxemasi</div>
+            <div class="accent-swatch-row">
+                <button class="accent-swatch" data-accent="violet" onclick="setAccentTheme('violet')" style="background:linear-gradient(135deg,#6D4FFF,#06B6D4)" aria-label="Binafsha"></button>
+                <button class="accent-swatch" data-accent="rose" onclick="setAccentTheme('rose')" style="background:linear-gradient(135deg,#FF5C8A,#FFB86B)" aria-label="Pushti"></button>
+                <button class="accent-swatch" data-accent="emerald" onclick="setAccentTheme('emerald')" style="background:linear-gradient(135deg,#10B981,#84CC16)" aria-label="Zumrad"></button>
+            </div>
+
+            {% if user %}
+            <div class="friends-section-title">Bolimlar</div>
+            <button class="settings-link-row" onclick="closeSettings(); openTasksModal();">
+                <span>✅ Vazifalar</span><span class="settings-link-arrow">›</span>
+            </button>
+            <button class="settings-link-row" onclick="closeSettings(); openSavedModal();">
+                <span>🔖 Saqlangan xabarlar</span><span class="settings-link-arrow">›</span>
+            </button>
+            <button class="settings-link-row" onclick="closeSettings(); openActivityModal();">
+                <span>📊 Faoliyatim</span><span class="settings-link-arrow">›</span>
+            </button>
+            <button class="settings-link-row" onclick="closeSettings(); openQuickPromptsModal();">
+                <span>⚡ Tezkor buyruqlar</span><span class="settings-link-arrow">›</span>
+            </button>
+            {% endif %}
+
             {% if user %}
             <div class="modal-row">
                 <span>Hisob</span>
@@ -345,28 +344,6 @@
                 <button class="modal-close" onclick="closeActivityModal()">X</button>
             </div>
             <div id="activity-content" class="activity-content"></div>
-        </div>
-    </div>
-
-    <!-- MAVZULAR MODALI -->
-    <div id="themes-modal" class="modal-overlay" onclick="if(event.target===this) closeThemesModal()">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>🎨 Mavzular</h3>
-                <button class="modal-close" onclick="closeThemesModal()">X</button>
-            </div>
-            <div class="modal-row">
-                <span>Yorug'lik rejimi</span>
-                <button class="theme-toggle" onclick="toggleTheme()">
-                    <span id="theme-label-2">Och rang</span>
-                </button>
-            </div>
-            <div class="friends-section-title">Rang sxemasi</div>
-            <div class="accent-swatch-row">
-                <button class="accent-swatch" data-accent="violet" onclick="setAccentTheme('violet')" style="background:linear-gradient(135deg,#6D4FFF,#06B6D4)"></button>
-                <button class="accent-swatch" data-accent="rose" onclick="setAccentTheme('rose')" style="background:linear-gradient(135deg,#FF5C8A,#FFB86B)"></button>
-                <button class="accent-swatch" data-accent="emerald" onclick="setAccentTheme('emerald')" style="background:linear-gradient(135deg,#10B981,#84CC16)"></button>
-            </div>
         </div>
     </div>
 

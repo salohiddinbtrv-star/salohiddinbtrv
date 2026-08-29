@@ -296,6 +296,7 @@ function buildFeedbackHtml(data) {
     return '<div class="ai-feedback">' +
         '<button class="feedback-btn" onclick="sendAIFeedback(\'' + p + '\',\'' + r + '\',1,this)" aria-label="Yoqdi">👍</button>' +
         '<button class="feedback-btn" onclick="sendAIFeedback(\'' + p + '\',\'' + r + '\',-1,this)" aria-label="Yoqmadi">👎</button>' +
+        '<button class="feedback-btn" onclick="saveMessageToList(decodeURIComponent(\'' + r + '\'),this)" aria-label="Saqlash">🔖</button>' +
         '</div>';
 }
 
@@ -1480,6 +1481,226 @@ function initNeuralBackground() {
     });
 }
 
+/* ---------- VAZIFALAR ---------- */
+function openTasksModal() {
+    document.getElementById('tasks-modal').classList.add('open');
+    loadTasks();
+}
+
+function closeTasksModal() {
+    document.getElementById('tasks-modal').classList.remove('open');
+}
+
+async function loadTasks() {
+    try {
+        const res = await fetch('/api/tasks');
+        const tasks = await res.json();
+        const el = document.getElementById('tasks-list');
+        if (!el) return;
+
+        if (tasks.length === 0) {
+            el.innerHTML = '<div class="sidebar-empty">Hali vazifalar yoq</div>';
+            return;
+        }
+
+        el.innerHTML = tasks.map(function (t) {
+            return '<div class="task-item">' +
+                '<input type="checkbox" ' + (t.is_done ? 'checked' : '') + ' onchange="toggleTask(' + t.id + ')">' +
+                '<span class="task-text' + (t.is_done ? ' done' : '') + '">' + escapeHtml(t.text) + '</span>' +
+                '<button class="task-delete-btn" onclick="deleteTask(' + t.id + ')" aria-label="Ochirish">✕</button>' +
+                '</div>';
+        }).join('');
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function addTask() {
+    const input = document.getElementById('task-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    try {
+        const res = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        });
+        const data = await res.json();
+        if (data.success) {
+            input.value = '';
+            loadTasks();
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function toggleTask(taskId) {
+    try {
+        await fetch('/api/tasks/' + taskId + '/toggle', { method: 'POST' });
+        loadTasks();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function deleteTask(taskId) {
+    try {
+        await fetch('/api/tasks/' + taskId, { method: 'DELETE' });
+        loadTasks();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+/* ---------- SAQLANGAN XABARLAR ---------- */
+function openSavedModal() {
+    document.getElementById('saved-modal').classList.add('open');
+    loadSavedMessages();
+}
+
+function closeSavedModal() {
+    document.getElementById('saved-modal').classList.remove('open');
+}
+
+async function loadSavedMessages() {
+    try {
+        const res = await fetch('/api/saved-messages');
+        const items = await res.json();
+        const el = document.getElementById('saved-list');
+        if (!el) return;
+
+        if (items.length === 0) {
+            el.innerHTML = '<div class="sidebar-empty">Hali saqlangan xabar yoq</div>';
+            return;
+        }
+
+        el.innerHTML = items.map(function (s) {
+            return '<div class="task-item saved-item">' +
+                '<span class="task-text">' + escapeHtml(s.content) + '</span>' +
+                '<button class="task-delete-btn" onclick="deleteSavedMessage(' + s.id + ')" aria-label="Ochirish">✕</button>' +
+                '</div>';
+        }).join('');
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function saveMessageToList(content, btnEl) {
+    try {
+        const res = await fetch('/api/saved-messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content })
+        });
+        const data = await res.json();
+        if (data.success && btnEl) {
+            btnEl.classList.add('feedback-selected');
+            btnEl.disabled = true;
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function deleteSavedMessage(savedId) {
+    try {
+        await fetch('/api/saved-messages/' + savedId, { method: 'DELETE' });
+        loadSavedMessages();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+/* ---------- FAOLIYATIM ---------- */
+function openActivityModal() {
+    document.getElementById('activity-modal').classList.add('open');
+    loadActivity();
+}
+
+function closeActivityModal() {
+    document.getElementById('activity-modal').classList.remove('open');
+}
+
+async function loadActivity() {
+    try {
+        const res = await fetch('/api/my-activity');
+        const data = await res.json();
+        const el = document.getElementById('activity-content');
+        if (!el) return;
+
+        el.innerHTML =
+            '<div class="activity-stat-grid">' +
+                '<div class="activity-stat"><span class="activity-stat-value">🔥 ' + data.streak_count + '</span><span class="activity-stat-label">Kunlik ketma-ketlik</span></div>' +
+                '<div class="activity-stat"><span class="activity-stat-value">' + data.friends_count + '</span><span class="activity-stat-label">Dostlar</span></div>' +
+                '<div class="activity-stat"><span class="activity-stat-value">' + data.groups_count + '</span><span class="activity-stat-label">Guruhlar</span></div>' +
+                '<div class="activity-stat"><span class="activity-stat-value">' + data.friend_messages_sent + '</span><span class="activity-stat-label">Dostlarga xabarlar</span></div>' +
+                '<div class="activity-stat"><span class="activity-stat-value">' + data.group_messages_sent + '</span><span class="activity-stat-label">Guruh xabarlari</span></div>' +
+                '<div class="activity-stat"><span class="activity-stat-value">' + data.joined_date + '</span><span class="activity-stat-label">Royxatdan otgan sana</span></div>' +
+            '</div>';
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+/* ---------- RANG SXEMASI ---------- */
+const ACCENT_KEY = 'notfic_accent_theme';
+
+function setAccentTheme(name) {
+    document.documentElement.setAttribute('data-accent', name);
+    localStorage.setItem(ACCENT_KEY, name);
+    document.querySelectorAll('.accent-swatch').forEach(function (s) {
+        s.classList.toggle('active', s.getAttribute('data-accent') === name);
+    });
+}
+
+function applyStoredAccent() {
+    const saved = localStorage.getItem(ACCENT_KEY);
+    if (saved) setAccentTheme(saved);
+}
+
+/* ---------- TEZKOR BUYRUQLAR ---------- */
+function openQuickPromptsModal() {
+    document.getElementById('quick-prompts-modal').classList.add('open');
+    loadQuickPrompts();
+}
+
+function closeQuickPromptsModal() {
+    document.getElementById('quick-prompts-modal').classList.remove('open');
+}
+
+async function loadQuickPrompts() {
+    try {
+        const res = await fetch('/api/quick-prompts');
+        const items = await res.json();
+        const el = document.getElementById('quick-prompts-list');
+        if (!el) return;
+
+        el.innerHTML = items.map(function (p, i) {
+            return '<button class="quick-prompt-btn" onclick="useQuickPrompt(' + i + ')">' + escapeHtml(p.label) + '</button>';
+        }).join('');
+
+        el.setAttribute('data-prompts', JSON.stringify(items));
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function useQuickPrompt(index) {
+    const el = document.getElementById('quick-prompts-list');
+    const items = JSON.parse(el.getAttribute('data-prompts') || '[]');
+    const item = items[index];
+    if (!item) return;
+
+    closeQuickPromptsModal();
+    newAIChat();
+
+    const messageInput = document.getElementById('message-input');
+    messageInput.value = item.prompt;
+    sendMessage();
+}
+
 /* ---------- YANGILIKLAR (E'LONLAR) ---------- */
 const ANNOUNCEMENT_SEEN_KEY = 'notfic_last_seen_announcement_id';
 
@@ -1789,6 +2010,7 @@ window.addEventListener('appinstalled', function () {
 
 window.addEventListener('DOMContentLoaded', function() {
     applyTheme(localStorage.getItem(THEME_KEY) || 'light');
+    applyStoredAccent();
     initNeuralBackground();
     updateNotifSettingsUI();
 
