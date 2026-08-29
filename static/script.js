@@ -1625,8 +1625,14 @@ function startVoiceListening() {
     voiceRecognition.interimResults = false;
 
     voiceRecognition.onresult = function (event) {
-        const transcript = event.results[event.results.length - 1][0].transcript.trim();
-        if (transcript) handleVoiceCommand(transcript);
+        const result = event.results[event.results.length - 1];
+        const transcript = result[0].transcript.trim();
+        const confidence = result[0].confidence;
+
+        if (!transcript || transcript.length < 2) return;
+        if (typeof confidence === 'number' && confidence > 0 && confidence < 0.55) return;
+
+        handleVoiceCommand(transcript);
     };
 
     voiceRecognition.onerror = function () {
@@ -1772,7 +1778,10 @@ function handleVoiceCommand(transcript) {
         }
     }
 
-    // Hech narsa mos kelmasa — xabar sifatida AI'ga yuboriladi
+    // Hech narsa mos kelmasa — faqat chaqiruv sozi ("Hey Notfic") aytilgan bolsa
+    // xabar sifatida AI'ga yuboriladi. Aks holda, tasodifiy shovqin chatga tushmasligi uchun etiborsiz qoldiriladi.
+    if (!hadWakeWord) return;
+
     const messageInput = document.getElementById('message-input');
     if (messageInput) {
         messageInput.value = text;
@@ -2266,6 +2275,9 @@ function speakOnboardingText(text) {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
 
+    const wasListening = voiceAssistantActive;
+    if (wasListening) stopVoiceListening();
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'uz-UZ';
     utterance.rate = 1.0;
@@ -2275,6 +2287,13 @@ function speakOnboardingText(text) {
     const ruVoice = voices.find(function (v) { return v.lang && v.lang.toLowerCase().indexOf('ru') === 0; });
     if (uzVoice) utterance.voice = uzVoice;
     else if (ruVoice) utterance.voice = ruVoice;
+
+    utterance.onend = function () {
+        if (wasListening && isVoiceAssistantEnabled()) {
+            setTimeout(startVoiceListening, 400);
+        }
+    };
+    utterance.onerror = utterance.onend;
 
     window.speechSynthesis.speak(utterance);
 }
