@@ -2271,12 +2271,48 @@ function renderOnboardingDots() {
     }).join('');
 }
 
-function speakOnboardingText(text) {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
+let currentTtsAudio = null;
 
+async function speakOnboardingText(text) {
     const wasListening = voiceAssistantActive;
     if (wasListening) stopVoiceListening();
+
+    if (currentTtsAudio) {
+        currentTtsAudio.pause();
+        currentTtsAudio = null;
+    }
+
+    try {
+        const res = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        });
+
+        if (res.ok) {
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            currentTtsAudio = new Audio(url);
+            currentTtsAudio.onended = function () {
+                URL.revokeObjectURL(url);
+                if (wasListening && isVoiceAssistantEnabled()) {
+                    setTimeout(startVoiceListening, 400);
+                }
+            };
+            currentTtsAudio.onerror = currentTtsAudio.onended;
+            currentTtsAudio.play();
+            return;
+        }
+    } catch (e) {
+        console.error(e);
+    }
+
+    speakWithBrowserVoice(text, wasListening);
+}
+
+function speakWithBrowserVoice(text, wasListening) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'uz-UZ';
