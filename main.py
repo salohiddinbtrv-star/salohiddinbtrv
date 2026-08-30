@@ -16,7 +16,6 @@ from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from groq import Groq
 import requests
-from xml.sax.saxutils import escape as xml_escape
 
 load_dotenv()
 
@@ -24,8 +23,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("notfic")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY")
-AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus")
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 SECRET_KEY = os.getenv("SECRET_KEY", "notfic_secret_key_123")
 AI_MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-20b")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "notfic_admin_2026")
@@ -1115,44 +1114,40 @@ def api_quick_prompts():
 
 @app.route('/api/tts', methods=['POST'])
 def api_tts():
-    if not AZURE_SPEECH_KEY:
+    if not ELEVENLABS_API_KEY:
         return jsonify({"error": "tts_not_configured"}), 503
 
     data = request.get_json() or {}
     text = (data.get('text') or '').strip()[:1000]
-    voice = data.get('voice') or 'uz-UZ-MadinaNeural'
+    voice_id = data.get('voice_id') or ELEVENLABS_VOICE_ID
 
     if not text:
         return jsonify({"error": "empty_text"}), 400
 
-    ssml = (
-        "<speak version='1.0' xml:lang='uz-UZ'>"
-        f"<voice xml:lang='uz-UZ' name='{xml_escape(voice)}'>"
-        f"{xml_escape(text)}"
-        "</voice></speak>"
-    )
-
     try:
         resp = requests.post(
-            f"https://{AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1",
+            f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
             headers={
-                "Ocp-Apim-Subscription-Key": AZURE_SPEECH_KEY,
-                "Content-Type": "application/ssml+xml",
-                "X-Microsoft-OutputFormat": "audio-16khz-64kbitrate-mono-mp3",
-                "User-Agent": "Notfic"
+                "xi-api-key": ELEVENLABS_API_KEY,
+                "Content-Type": "application/json",
+                "Accept": "audio/mpeg"
             },
-            data=ssml.encode('utf-8'),
-            timeout=15
+            json={
+                "text": text,
+                "model_id": "eleven_multilingual_v2",
+                "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}
+            },
+            timeout=20
         )
 
         if resp.status_code == 200:
             return app.response_class(resp.content, mimetype='audio/mpeg')
 
-        logger.error(f"Azure TTS xatosi: {resp.status_code} {resp.text[:200]}")
+        logger.error(f"ElevenLabs TTS xatosi: {resp.status_code} {resp.text[:200]}")
         return jsonify({"error": "tts_failed"}), 502
 
     except Exception as e:
-        logger.error(f"Azure TTS xatosi: {e}")
+        logger.error(f"ElevenLabs TTS xatosi: {e}")
         return jsonify({"error": "tts_failed"}), 502
 
 
