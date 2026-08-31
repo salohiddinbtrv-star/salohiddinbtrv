@@ -1614,6 +1614,26 @@ function disableVoiceAssistant() {
     stopVoiceListening();
 }
 
+let voiceInterimTranscript = '';
+let voiceSilenceTimer = null;
+const VOICE_SILENCE_MS = 1400;
+
+function updateVoiceMicPreview(text) {
+    let bubble = document.getElementById('voice-preview-bubble');
+    if (!bubble) {
+        bubble = document.createElement('div');
+        bubble.id = 'voice-preview-bubble';
+        bubble.className = 'voice-preview-bubble';
+        document.body.appendChild(bubble);
+    }
+    if (text) {
+        bubble.textContent = text;
+        bubble.classList.add('show');
+    } else {
+        bubble.classList.remove('show');
+    }
+}
+
 function startVoiceListening() {
     if (!isVoiceAssistantSupported() || !isVoiceAssistantEnabled()) return;
     if (voiceAssistantActive) return;
@@ -1622,20 +1642,38 @@ function startVoiceListening() {
     voiceRecognition = new SpeechRecognitionCtor();
     voiceRecognition.lang = 'uz-UZ';
     voiceRecognition.continuous = true;
-    voiceRecognition.interimResults = false;
+    voiceRecognition.interimResults = true;
+    voiceRecognition.maxAlternatives = 1;
+
+    voiceInterimTranscript = '';
 
     voiceRecognition.onresult = function (event) {
-        const result = event.results[event.results.length - 1];
-        const transcript = result[0].transcript.trim();
-        const confidence = result[0].confidence;
+        let interim = '';
+        let finalChunk = '';
 
-        if (!transcript || transcript.length < 2) return;
-        if (typeof confidence === 'number' && confidence > 0 && confidence < 0.55) return;
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const chunk = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalChunk += chunk;
+            } else {
+                interim += chunk;
+            }
+        }
 
-        handleVoiceCommand(transcript);
+        if (finalChunk) voiceInterimTranscript += finalChunk;
+        updateVoiceMicPreview((voiceInterimTranscript + ' ' + interim).trim());
+
+        clearTimeout(voiceSilenceTimer);
+        voiceSilenceTimer = setTimeout(function () {
+            const finished = voiceInterimTranscript.trim();
+            voiceInterimTranscript = '';
+            updateVoiceMicPreview('');
+            if (finished) handleVoiceCommand(finished);
+        }, VOICE_SILENCE_MS);
     };
 
-    voiceRecognition.onerror = function () {
+    voiceRecognition.onerror = function (event) {
+        if (event.error === 'no-speech' || event.error === 'aborted') return;
         voiceAssistantActive = false;
     };
 
@@ -1643,7 +1681,7 @@ function startVoiceListening() {
         voiceAssistantActive = false;
         if (isVoiceAssistantEnabled() && document.visibilityState === 'visible') {
             clearTimeout(voiceRestartTimer);
-            voiceRestartTimer = setTimeout(startVoiceListening, 600);
+            voiceRestartTimer = setTimeout(startVoiceListening, 300);
         }
     };
 
@@ -1659,6 +1697,8 @@ function startVoiceListening() {
 
 function stopVoiceListening() {
     clearTimeout(voiceRestartTimer);
+    clearTimeout(voiceSilenceTimer);
+    updateVoiceMicPreview('');
     if (voiceRecognition) {
         try { voiceRecognition.stop(); } catch (e) { /* ignore */ }
     }
@@ -1687,21 +1727,28 @@ function containsWakeWord(text) {
 
 function handleVoiceCommand(transcript) {
     let text = transcript.toLowerCase().trim();
-    const hadWakeWord = containsWakeWord(text);
+    if (!text) return;
 
+    // Sof salomlashuv — tabiiy javob
+    if (/^(salom|salomlar|assalomu[\s']?alaykum|salom notfic)[\s!.,]*$/.test(text)) {
+        speakOnboardingText('Salom, qalaysiz? Sizga qanday yordam bera olaman?', 'happy');
+        return;
+    }
+
+    const hadWakeWord = containsWakeWord(text);
     if (hadWakeWord) {
-        text = stripWakeWord(text);
+        text = stripWakeWord(text).trim();
     }
 
     if (hadWakeWord && text.length === 0) {
-        speakOnboardingText('Hey sir! Tinglayapman, buyruq bering.');
+        speakOnboardingText('Hey sir! Tinglayapman, buyruq bering.', 'happy');
         showNotificationToast('🎙 Hey sir! Tinglayapman...');
         return;
     }
 
     if (!text) return;
 
-    // Tinglashni tokhtatish buyrugi
+    // Tinglashni tokhtatish
     if (/tinglashni tokhtat|ovozni ochir|meni eshitma|sukut/.test(text)) {
         speakOnboardingText('Xop, tinglashni tokhtataman.');
         disableVoiceAssistant();
@@ -1719,8 +1766,8 @@ function handleVoiceCommand(transcript) {
 
     // Yordam / nima qila olasan
     if (/nima qila olasan|yordam ber|komandalar|buyruqlar royxati/.test(text)) {
-        const helpText = "Men do'stlar, guruhlar, vazifalar, sozlamalar kabi bolimlarni ochishim, vazifa qoshishim, mavzuni ozgartirishim va sizning xabaringizni AI'ga yuborishim mumkin.";
-        speakOnboardingText(helpText);
+        const helpText = "Men do'stlar, guruhlar, vazifalar, sozlamalar bolimlarini ochishim, vazifa qoshib-bajarishim, dost bilan suhbat ochishim, mavzuni ozgartirishim va sizning xabaringizni AI'ga yuborishim mumkin.";
+        speakOnboardingText(helpText, 'happy');
         showNotificationToast('🎙 ' + helpText);
         return;
     }
@@ -1728,12 +1775,38 @@ function handleVoiceCommand(transcript) {
     // Qorongi / yorug rejim
     if (/qorong[gi]?i? rejim|tun rejimi|qorayt/.test(text)) {
         applyTheme('dark');
-        speakOnboardingText('Qorongi rejimga otdim.');
+        speakOnboardingText('Qorongi rejimga otdim.', 'happy');
         return;
     }
     if (/yorug rejim|kun rejimi|yorit/.test(text)) {
         applyTheme('light');
-        speakOnboardingText('Yorug rejimga otdim.');
+        speakOnboardingText('Yorug rejimga otdim.', 'happy');
+        return;
+    }
+
+    // Bildirishnomalar
+    if (/bildirishnomalarni yoq/.test(text)) {
+        enableBrowserNotifications();
+        speakOnboardingText('Bildirishnomalar yoqildi.', 'happy');
+        return;
+    }
+    if (/bildirishnomalarni ochir/.test(text)) {
+        disableBrowserNotifications();
+        speakOnboardingText('Bildirishnomalar ochirildi.');
+        return;
+    }
+
+    // Sahifani yangilash
+    if (/sahifani yangila|qayta yukla/.test(text)) {
+        speakOnboardingText('Yangilanmoqda.');
+        setTimeout(function () { location.reload(); }, 800);
+        return;
+    }
+
+    // Kunlik ketma-ketlik (streak)
+    if (/necha kunlik ketma|streak|ketma-ketligim/.test(text)) {
+        const streak = document.body.getAttribute('data-streak') || '0';
+        speakOnboardingText('Sizning kunlik ketma-ketligingiz ' + streak + ' kun.', 'happy');
         return;
     }
 
@@ -1746,8 +1819,39 @@ function handleVoiceCommand(transcript) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: taskText })
         }).then(function () {
-            speakOnboardingText('Vazifa qoshildi: ' + taskText);
+            speakOnboardingText('Vazifa qoshildi: ' + taskText, 'happy');
             showNotificationToast('✅ Vazifa qoshildi: ' + taskText);
+        }).catch(function (e) { console.error(e); });
+        return;
+    }
+
+    // Vazifalarni ovozda oqish
+    if (/vazifalarni oqi|vazifalar royxati|vazifalarim/.test(text)) {
+        fetch('/api/tasks').then(function (r) { return r.json(); }).then(function (tasks) {
+            const pending = tasks.filter(function (t) { return !t.is_done; });
+            if (pending.length === 0) {
+                speakOnboardingText('Barcha vazifalar bajarilgan, ajoyib!', 'happy');
+            } else {
+                speakOnboardingText('Sizda ' + pending.length + ' ta vazifa bor: ' + pending.map(function (t) { return t.text; }).join(', '));
+            }
+        }).catch(function (e) { console.error(e); });
+        return;
+    }
+
+    // Vazifani bajardim deb belgilash
+    const doneMatch = text.match(/(?:vazifani bajardim|bajardim)\s+(.+)/);
+    if (doneMatch && doneMatch[1]) {
+        const query = doneMatch[1].trim();
+        fetch('/api/tasks').then(function (r) { return r.json(); }).then(function (tasks) {
+            const match = tasks.find(function (t) { return !t.is_done && t.text.toLowerCase().indexOf(query) !== -1; });
+            if (match) {
+                fetch('/api/tasks/' + match.id + '/toggle', { method: 'POST' }).then(function () {
+                    speakOnboardingText(match.text + ' bajarildi deb belgilandi. Barakalla!', 'happy');
+                    fireConfetti();
+                });
+            } else {
+                speakOnboardingText('Kechirasiz, bunday vazifa topilmadi.', 'annoyed');
+            }
         }).catch(function (e) { console.error(e); });
         return;
     }
@@ -1764,6 +1868,30 @@ function handleVoiceCommand(transcript) {
         return;
     }
 
+    // Faoliyat/statistika
+    if (/faoliyatimni oqi|statistikamni ayt|faoliyatim qanday/.test(text)) {
+        fetch('/api/my-activity').then(function (r) { return r.json(); }).then(function (d) {
+            speakOnboardingText('Sizda ' + d.friends_count + ' ta dost, ' + d.groups_count + ' ta guruh, va ' + d.streak_count + ' kunlik ketma-ketlik bor.');
+        }).catch(function (e) { console.error(e); });
+        return;
+    }
+
+    // Dost bilan yozish: "[ism] bilan yoz" yoki "[ism]ga xabar"
+    if (IS_LOGGED_IN) {
+        const friendMatch = text.match(/(.+?)\s*(?:bilan yoz|ga xabar|bilan gaplash|bilan suhbat)/);
+        if (friendMatch && friendMatch[1]) {
+            const name = friendMatch[1].trim();
+            const friend = (cachedFriendsList || []).find(function (f) { return f.name.toLowerCase().indexOf(name) !== -1; });
+            if (friend) {
+                switchToFriend(friend.id, friend.name, friend.avatar);
+                speakOnboardingText(friend.name + ' bilan suhbat ochildi.', 'happy');
+            } else {
+                speakOnboardingText(name + ' ismli dost topilmadi.', 'annoyed');
+            }
+            return;
+        }
+    }
+
     // Bolim/harakat buyruqlari (Buyruqlar panelidagi royxatdan)
     const items = buildCommandPaletteItems();
     for (let i = 0; i < items.length; i++) {
@@ -1771,17 +1899,23 @@ function handleVoiceCommand(transcript) {
         for (let j = 0; j < keywordList.length; j++) {
             if (keywordList[j].length > 2 && text.indexOf(keywordList[j]) !== -1) {
                 showNotificationToast('🎙 Bajarilmoqda: ' + items[i].label);
-                speakOnboardingText(items[i].label + ' ochilmoqda.');
+                speakOnboardingText(items[i].label + ' ochilmoqda.', 'happy');
                 items[i].action();
                 return;
             }
         }
     }
 
-    // Hech narsa mos kelmasa — faqat chaqiruv sozi ("Hey Notfic") aytilgan bolsa
-    // xabar sifatida AI'ga yuboriladi. Aks holda, tasodifiy shovqin chatga tushmasligi uchun etiborsiz qoldiriladi.
+    // Hech narsa mos kelmasa — faqat chaqiruv sozi ("Hey Notfic") aytilgan bolsa etibor beramiz
     if (!hadWakeWord) return;
 
+    // Juda qisqa/tushunarsiz gap bolsa, qayta soralaydi
+    if (text.length < 4 || text.split(' ').length === 1) {
+        speakOnboardingText('Kechirasiz, tushunmadim. Iltimos qayta gapiring.', 'annoyed');
+        return;
+    }
+
+    // Aks holda — xabar sifatida AI'ga yuboriladi
     const messageInput = document.getElementById('message-input');
     if (messageInput) {
         messageInput.value = text;
@@ -2273,7 +2407,7 @@ function renderOnboardingDots() {
 
 let currentTtsAudio = null;
 
-async function speakOnboardingText(text) {
+async function speakOnboardingText(text, mood) {
     const wasListening = voiceAssistantActive;
     if (wasListening) stopVoiceListening();
 
@@ -2286,7 +2420,7 @@ async function speakOnboardingText(text) {
         const res = await fetch('/api/tts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: text })
+            body: JSON.stringify({ text: text, mood: mood || 'neutral' })
         });
 
         if (res.ok) {

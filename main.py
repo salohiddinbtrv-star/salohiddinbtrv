@@ -76,6 +76,10 @@ google = oauth.register(
 SYSTEM_PROMPT = (
     "Sening isming Notfic. Sen Notfic platformasining aqlli yordamchisisan. "
     "Do'stona, qisqa, tushunarli va aqlli javob ber. "
+    "Har bir xabaringni 'salom' yoki boshqa salomlashuv sozi bilan boshlama — "
+    "faqat foydalanuvchi ozi salomlashganda yoki suhbat aynan boshlanayotganda salomlash. "
+    "Suhbatni tabiiy, erkin davom ettir — xuddi ChatGPT kabi, kontekstga mos, "
+    "keraksiz takrorlarsiz javob ber. "
     "Agar kimdir seni kim yaratgani, kimning loyihasi ekanligi yoki muallifing haqida sorasa, "
     "Notfic platformasini Salohiddin Botirov yaratganini ayt."
 )
@@ -1120,9 +1124,17 @@ def api_tts():
     data = request.get_json() or {}
     text = (data.get('text') or '').strip()[:1000]
     voice_id = data.get('voice_id') or ELEVENLABS_VOICE_ID
+    mood = data.get('mood') or 'neutral'
 
     if not text:
         return jsonify({"error": "empty_text"}), 400
+
+    mood_settings = {
+        "happy": {"stability": 0.3, "similarity_boost": 0.8, "style": 0.7},
+        "annoyed": {"stability": 0.7, "similarity_boost": 0.7, "style": 0.2},
+        "neutral": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.4}
+    }
+    settings = mood_settings.get(mood, mood_settings["neutral"])
 
     try:
         resp = requests.post(
@@ -1135,7 +1147,7 @@ def api_tts():
             json={
                 "text": text,
                 "model_id": "eleven_multilingual_v2",
-                "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}
+                "voice_settings": settings
             },
             timeout=20
         )
