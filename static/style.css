@@ -1704,8 +1704,33 @@ html, body {
     50% { box-shadow: var(--shadow-lg), 0 0 0 12px rgba(139,107,255,0); }
 }
 
+.voice-preview-bubble {
+    position: fixed;
+    right: 20px;
+    bottom: 150px;
+    max-width: 260px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--ink);
+    box-shadow: var(--shadow-lg);
+    z-index: 149;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.voice-preview-bubble.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 @media (max-width: 720px) {
     .voice-mic-btn { bottom: 82px; right: 14px; width: 48px; height: 48px; }
+    .voice-preview-bubble { bottom: 140px; right: 14px; max-width: 220px; }
     .command-palette-overlay { padding-top: 8vh; align-items: flex-start; }
     .command-palette { margin: 0 12px; }
 }
