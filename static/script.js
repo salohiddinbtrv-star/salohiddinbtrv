@@ -2606,13 +2606,7 @@ window.addEventListener('DOMContentLoaded', function() {
     if (isVoiceAssistantEnabled()) startVoiceListening();
     updateNotifSettingsUI();
 
-    const chats = loadChats();
-    const chatIds = Object.keys(chats).sort(function (a, b) { return b.localeCompare(a); });
-    if (chatIds.length > 0) {
-        setActiveChatId(chatIds[0]);
-    } else {
-        setActiveChatId('chat_' + Date.now());
-    }
+    setActiveChatId('chat_' + Date.now());
 
     renderChatList();
     renderMessages();
