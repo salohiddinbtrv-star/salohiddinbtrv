@@ -2548,27 +2548,56 @@ function isStandaloneMode() {
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
+const DESKTOP_DOWNLOAD_URL = 'https://github.com/salohiddinbtrv-star/notfic-desktop/releases/latest';
+const ANDROID_DOWNLOAD_URL = 'https://github.com/salohiddinbtrv-star/notfic-android/releases/latest';
+
+function isElectronApp() {
+    return navigator.userAgent.toLowerCase().indexOf('electron') !== -1;
+}
+
+function isAndroidDevice() {
+    return /android/i.test(navigator.userAgent);
+}
+
+function isCapacitorApp() {
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+
 function updateInstallBannerContent() {
     const text = document.getElementById('install-banner-text');
     const btn = document.getElementById('install-banner-btn');
+    const title = document.getElementById('install-banner-title');
     if (!text || !btn) return;
 
     if (isIosDevice()) {
+        if (title) title.textContent = "Notfic'ni ornating";
         text.textContent = "Pastdagi Ulashish tugmasini bosib, 'Bosh ekranga qoshish'ni tanlang.";
         btn.style.display = 'none';
-    } else if (deferredInstallPrompt) {
-        text.textContent = "Tezroq va qulayroq foydalanish uchun ilovani ornating.";
+    } else if (isAndroidDevice()) {
+        if (title) title.textContent = 'Notfic Android';
+        text.textContent = "Notfic'ning haqiqiy Android ilovasini yuklab oling.";
         btn.style.display = 'inline-flex';
-        btn.onclick = installApp;
+        btn.textContent = 'Yuklab olish';
+        btn.onclick = function () {
+            window.open(ANDROID_DOWNLOAD_URL, '_blank');
+            dismissInstallBanner();
+        };
     } else {
-        text.textContent = "Brauzer menyusi (⋮) dan \"Ilovani ornatish\" yoki \"Bosh ekranga qoshish\"ni tanlang.";
-        btn.style.display = 'none';
+        if (title) title.textContent = 'Notfic Desktop';
+        text.textContent = 'Kompyuteringizga Notfic Desktop ilovasini yuklab oling.';
+        btn.style.display = 'inline-flex';
+        btn.textContent = 'Yuklab olish';
+        btn.onclick = function () {
+            window.open(DESKTOP_DOWNLOAD_URL, '_blank');
+            dismissInstallBanner();
+        };
     }
 }
 
 function showInstallBanner() {
     if (localStorage.getItem(INSTALL_DISMISS_KEY) === 'true') return;
     if (isStandaloneMode()) return;
+    if (isElectronApp() || isCapacitorApp()) return;
     updateInstallBannerContent();
     const banner = document.getElementById('install-banner');
     if (banner) banner.classList.add('show');
