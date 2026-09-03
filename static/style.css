@@ -549,6 +549,42 @@ html, body {
 .feedback-btn:hover { opacity: 0.9; background: var(--hover); }
 .feedback-btn:disabled { cursor: default; }
 .feedback-btn.feedback-selected { opacity: 1; }
+.feedback-btn.tts-btn.tts-playing { opacity: 1; color: var(--accent); }
+
+/* ---------- OQIM (STREAMING) YOZISH EFFEKTI ---------- */
+.stream-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 14px;
+    margin-left: 2px;
+    background: var(--accent);
+    vertical-align: middle;
+    animation: stream-cursor-blink 0.9s infinite;
+}
+
+@keyframes stream-cursor-blink {
+    0%, 45% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+/* ---------- BOGLANISH DARAJASI — YUQORI DARAJA VIZUAL MUKOFOTLARI ---------- */
+.bond-badge-glow {
+    box-shadow: 0 0 0 1px var(--accent), 0 0 12px var(--accent-soft);
+    animation: bond-badge-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes bond-badge-pulse {
+    0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 10px var(--accent-soft); }
+    50% { box-shadow: 0 0 0 1px var(--accent), 0 0 18px var(--accent-soft); }
+}
+
+.bond-badge-gold {
+    background: linear-gradient(135deg, rgba(255,193,71,0.22), rgba(255,138,61,0.22));
+    border-color: #FFB84D;
+    box-shadow: 0 0 0 1px #FFB84D, 0 0 14px rgba(255,184,77,0.5);
+}
+.bond-badge-gold #bond-badge-title { color: #C97A1C; }
+.bond-badge-gold .bond-badge-fill { background: linear-gradient(90deg, #FFB84D, #FF8A3D); }
 
 /* ---------- XABAR REAKSIYALARI ---------- */
 .msg-reaction-row {

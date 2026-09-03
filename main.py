@@ -424,6 +424,26 @@ def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None
     if not prompt or not prompt.strip():
         return f"{AI_NAME}: Savolingizni yozing, men yordam berishga tayyorman!"
 
+    messages, model_to_use = _build_ai_messages(prompt, context, user, extra_system_note, image_data_uri)
+
+    try:
+        completion = ai_client.chat.completions.create(
+            model=model_to_use,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1024
+        )
+        return completion.choices[0].message.content
+
+    except Exception as e:
+        logger.error(f"Groq AI xatosi: {e}")
+        if image_data_uri:
+            return f"{AI_NAME}: Rasmni tahlil qila olmadim, birozdan song qayta urinib koring."
+        return f"{AI_NAME}: Hozir javob bera olmadim, birozdan song qayta urinib koring."
+
+
+def _build_ai_messages(prompt, context, user, extra_system_note, image_data_uri):
+    """get_ai_response va stream_ai_response uchun umumiy xabar/model tayyorlash mantigi."""
     style_notes = get_user_ai_style_notes(user)
     bond_note = get_bond_prompt_note(user)
     system_content = SYSTEM_PROMPT
@@ -461,20 +481,65 @@ def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None
         messages.append({"role": "user", "content": prompt.strip()})
         model_to_use = AI_MODEL
 
+    return messages, model_to_use
+
+
+def stream_ai_response(prompt: str, context=None, user=None, extra_system_note=None,
+                        image_data_uri=None, on_chunk=None) -> str:
+    """AI javobini boâ€˜lak-boâ€˜lak (stream) generatsiya qiladi, har bir boâ€˜lakni on_chunk'ga yuboradi.
+    ChatGPT/Gemini'dagidek 'jonli yozilayotgan' effekt uchun."""
+    if not ai_client:
+        text = f"{AI_NAME}: Hozircha ulanmagan — server tomonida API kalit sozlanmagan."
+        if on_chunk:
+            on_chunk(text)
+        return text
+
+    if (not prompt or not prompt.strip()) and image_data_uri:
+        prompt = "Bu rasmda nima borligini tasvirlab ber va u haqida qiziqarli fikr bildir."
+
+    if not prompt or not prompt.strip():
+        text = f"{AI_NAME}: Savolingizni yozing, men yordam berishga tayyorman!"
+        if on_chunk:
+            on_chunk(text)
+        return text
+
+    messages, model_to_use = _build_ai_messages(prompt, context, user, extra_system_note, image_data_uri)
+
+    full_text = ""
     try:
-        completion = ai_client.chat.completions.create(
+        stream = ai_client.chat.completions.create(
             model=model_to_use,
             messages=messages,
             temperature=0.7,
-            max_tokens=1024
+            max_tokens=1024,
+            stream=True
         )
-        return completion.choices[0].message.content
+        for chunk in stream:
+            delta = ""
+            try:
+                delta = chunk.choices[0].delta.content or ""
+            except Exception:
+                delta = ""
+            if delta:
+                full_text += delta
+                if on_chunk:
+                    on_chunk(delta)
+
+        if not full_text.strip():
+            full_text = f"{AI_NAME}: Hozir javob bera olmadim, birozdan song qayta urinib koring."
+            if on_chunk:
+                on_chunk(full_text)
+
+        return full_text
 
     except Exception as e:
-        logger.error(f"Groq AI xatosi: {e}")
-        if image_data_uri:
-            return f"{AI_NAME}: Rasmni tahlil qila olmadim, birozdan song qayta urinib koring."
-        return f"{AI_NAME}: Hozir javob bera olmadim, birozdan song qayta urinib koring."
+        logger.error(f"Groq AI oqim xatosi: {e}")
+        fallback = (f"{AI_NAME}: Rasmni tahlil qila olmadim, birozdan song qayta urinib koring."
+                    if image_data_uri else
+                    f"{AI_NAME}: Hozir javob bera olmadim, birozdan song qayta urinib koring.")
+        if on_chunk:
+            on_chunk(fallback)
+        return fallback
 
 
 def current_user():
@@ -610,7 +675,8 @@ def index():
     show_onboarding = bool(user and not user.onboarding_seen)
     return render_template('index.html', user=user, display_avatar=display_avatar,
                             anon_limit=ANONYMOUS_MESSAGE_LIMIT, is_admin=is_admin,
-                            show_onboarding=show_onboarding, v=STATIC_VERSION)
+                            show_onboarding=show_onboarding, v=STATIC_VERSION,
+                            tts_enabled=bool(ELEVENLABS_API_KEY))
 
 
 @app.route('/health')
@@ -1736,9 +1802,17 @@ def handle_ai_message(data):
 
     emit('ai_typing', {'typing': True})
     user = current_user()
-    ai_reply = get_ai_response(msg, context, user=user, image_data_uri=image_data_uri)
+
+    stream_id = 'strm_' + str(next(public_msg_counter)) + '_' + str(int(datetime.utcnow().timestamp() * 1000))
+    emit('ai_stream_start', {'streamId': stream_id})
     emit('ai_typing', {'typing': False})
-    emit('ai_response_message', {'username': AI_NAME, 'message': ai_reply, 'isAI': True, 'prompt': msg})
+
+    def on_chunk(delta):
+        emit('ai_stream_chunk', {'streamId': stream_id, 'chunk': delta})
+        socketio.sleep(0)
+
+    ai_reply = stream_ai_response(msg, context, user=user, image_data_uri=image_data_uri, on_chunk=on_chunk)
+    emit('ai_stream_done', {'streamId': stream_id, 'message': ai_reply, 'prompt': msg})
 
     if user:
         bond_info, leveled_up = register_ai_interaction(user)

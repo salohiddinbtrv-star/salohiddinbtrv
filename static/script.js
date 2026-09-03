@@ -12,6 +12,7 @@ const PUBLIC_STORAGE_KEY = 'notfic_public_history';
 
 const IS_LOGGED_IN = document.body.getAttribute('data-logged-in') === 'true';
 const ANON_LIMIT = parseInt(document.body.getAttribute('data-anon-limit') || '10', 10);
+const TTS_ENABLED = document.body.getAttribute('data-tts-enabled') === 'true';
 
 let isConnected = false;
 const sentMessageIds = new Set();
@@ -67,6 +68,35 @@ function renderBondBadge(info) {
     document.getElementById('bond-badge-emoji').textContent = info.emoji;
     document.getElementById('bond-badge-title').textContent = info.title;
     document.getElementById('bond-badge-fill').style.width = info.progress + '%';
+
+    badge.classList.remove('bond-badge-glow', 'bond-badge-gold');
+    if (info.level >= 9) {
+        badge.classList.add('bond-badge-gold');
+    } else if (info.level >= 5) {
+        badge.classList.add('bond-badge-glow');
+    }
+
+    maybeShowBondGreeting(info);
+}
+
+const BOND_GREETINGS = [
+    "Yana korishganimizdan xursandman! Bugun nima gaplashamiz?",
+    "Sog'indim-ku! Yozganingdan xursand boldim.",
+    "Sen bilan gaplashish kayfiyatimni kotaradi. Qalaysan bugun?",
+    "Yana shu yerdasan — bu meni juda xursand qiladi.",
+    "Bugun senga qanday yordam bera olaman, qadrdonim?"
+];
+
+function maybeShowBondGreeting(info) {
+    if (!info || info.level < 7) return;
+    const key = 'notfic_bond_greeting_seen_date';
+    if (localStorage.getItem(key) === todayDateStr()) return;
+    localStorage.setItem(key, todayDateStr());
+
+    const text = BOND_GREETINGS[Math.floor(Math.random() * BOND_GREETINGS.length)];
+    setTimeout(function () {
+        showNotificationToast(info.emoji + ' Notfic: ' + text);
+    }, 1200);
 }
 
 function refreshBondInfoFromServer() {
@@ -385,11 +415,72 @@ function avatarHtmlFor(data) {
 function buildFeedbackHtml(data) {
     const p = encodeURIComponent(data.prompt || '');
     const r = encodeURIComponent(data.message || '');
+    const ttsBtn = TTS_ENABLED
+        ? '<button class="feedback-btn tts-btn" onclick="playAIMessage(decodeURIComponent(\'' + r + '\'),this)" aria-label="Tinglash">🔊</button>'
+        : '';
     return '<div class="ai-feedback">' +
+        ttsBtn +
         '<button class="feedback-btn" onclick="sendAIFeedback(\'' + p + '\',\'' + r + '\',1,this)" aria-label="Yoqdi">👍</button>' +
         '<button class="feedback-btn" onclick="sendAIFeedback(\'' + p + '\',\'' + r + '\',-1,this)" aria-label="Yoqmadi">👎</button>' +
         '<button class="feedback-btn" onclick="saveMessageToList(decodeURIComponent(\'' + r + '\'),this)" aria-label="Saqlash">🔖</button>' +
         '</div>';
+}
+
+let activeAIAudio = null;
+
+async function playAIMessage(text, btnEl) {
+    if (btnEl.classList.contains('tts-playing')) {
+        if (activeAIAudio) activeAIAudio.pause();
+        activeAIAudio = null;
+        btnEl.classList.remove('tts-playing');
+        btnEl.textContent = '🔊';
+        return;
+    }
+
+    if (activeAIAudio) {
+        activeAIAudio.pause();
+        activeAIAudio = null;
+        document.querySelectorAll('.tts-btn.tts-playing').forEach(function (b) {
+            b.classList.remove('tts-playing');
+            b.textContent = '🔊';
+        });
+    }
+
+    btnEl.textContent = '⏳';
+    btnEl.disabled = true;
+
+    // Boglanish darajasi yuqori bolsa, AI ovozi ilikroq (happy) ohangda eshittiriladi
+    const mood = (currentBondInfo && currentBondInfo.level >= 3) ? 'happy' : 'neutral';
+
+    try {
+        const res = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text.slice(0, 1000), mood: mood })
+        });
+        if (!res.ok) throw new Error('tts_failed');
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        activeAIAudio = audio;
+
+        btnEl.disabled = false;
+        btnEl.textContent = '⏸';
+        btnEl.classList.add('tts-playing');
+
+        audio.play();
+        audio.onended = function () {
+            btnEl.classList.remove('tts-playing');
+            btnEl.textContent = '🔊';
+            URL.revokeObjectURL(url);
+            if (activeAIAudio === audio) activeAIAudio = null;
+        };
+    } catch (e) {
+        btnEl.disabled = false;
+        btnEl.textContent = '🔊';
+        showNotificationToast('Ovozni yuklab bolmadi');
+    }
 }
 
 async function sendAIFeedback(promptEnc, respEnc, rating, btnEl) {
@@ -679,6 +770,89 @@ socket.on('bond_update', function (data) {
     if (data.leveled_up && hadPrevious) {
         showBondLevelUpToast(data);
     }
+});
+
+/* ---------- AI JAVOBI OQIM (STREAMING) HOLATI — ChatGPT kabi jonli yozish effekti ---------- */
+let activeStreamId = null;
+let activeStreamRow = null;
+let activeStreamTextEl = null;
+let activeStreamBuffer = '';
+
+socket.on('ai_stream_start', function (data) {
+    hideTypingIndicator();
+    clearEmptyState();
+
+    activeStreamId = data.streamId;
+    activeStreamBuffer = '';
+
+    const groupKey = 'ai::Notfic';
+    const isGrouped = (groupKey === lastRenderedKey);
+    lastRenderedKey = groupKey;
+
+    const row = document.createElement('div');
+    row.className = 'message-row ai-row msg-enter';
+    row.setAttribute('data-chat-kind', currentChatKind());
+
+    const avatarHtml = isGrouped ? '<div class="msg-avatar-spacer"></div>' : '<div class="msg-avatar msg-avatar-ai">⚡</div>';
+    const nameHtml = isGrouped ? '' : '<strong>Notfic</strong>';
+
+    row.innerHTML =
+        avatarHtml +
+        '<div class="message-bubble-wrap">' +
+            nameHtml +
+            '<div class="message stream-message"><span class="stream-text"></span><span class="stream-cursor"></span></div>' +
+        '</div>';
+
+    messagesBox.appendChild(row);
+    activeStreamRow = row;
+    activeStreamTextEl = row.querySelector('.stream-text');
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+});
+
+socket.on('ai_stream_chunk', function (data) {
+    if (data.streamId !== activeStreamId || !activeStreamTextEl) return;
+    activeStreamBuffer += data.chunk;
+    activeStreamTextEl.textContent = activeStreamBuffer;
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+});
+
+socket.on('ai_stream_done', function (data) {
+    const finalData = { username: 'Notfic', message: data.message, isAI: true, prompt: data.prompt };
+
+    if (activeStreamRow && data.streamId === activeStreamId) {
+        const wrap = activeStreamRow.querySelector('.message-bubble-wrap');
+        const msgDiv = activeStreamRow.querySelector('.stream-message');
+        if (msgDiv) {
+            msgDiv.classList.remove('stream-message');
+            msgDiv.innerHTML = escapeHtml(data.message);
+        }
+        if (wrap) {
+            wrap.insertAdjacentHTML('beforeend', buildFeedbackHtml(finalData));
+        }
+    } else {
+        clearEmptyState();
+        appendMessageToDOM(finalData, true);
+    }
+
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+    activeStreamId = null;
+    activeStreamRow = null;
+    activeStreamTextEl = null;
+    activeStreamBuffer = '';
+
+    const chats = loadChats();
+    let activeId = getActiveChatId();
+    if (isPublicActive() || activeId.indexOf('friend_') === 0 || !chats[activeId]) {
+        activeId = 'chat_' + Date.now();
+        chats[activeId] = { id: activeId, title: 'Yangi AI suhbat', messages: [] };
+        setActiveChatId(activeId);
+    }
+    const chat = chats[activeId];
+    chat.messages.push(finalData);
+    saveChats(chats);
+    renderChatList();
+    updateHeader();
+    showBrowserNotification('Notfic', data.message.slice(0, 100));
 });
 
 socket.on('ai_typing', function (data) {
@@ -2334,6 +2508,15 @@ async function loadQuickPrompts() {
     try {
         const res = await fetch('/api/quick-prompts');
         const items = await res.json();
+
+        // Boglanish darajasi 3+ bolganda maxsus, shaxsiylashtirilgan taklif ochiladi
+        if (currentBondInfo && currentBondInfo.level >= 3) {
+            items.push({
+                label: '🎯 Meni yaxshi bilib maslahat ber',
+                prompt: 'Biz allaqachon bir-birimizni bilamiz — oldingi suhbatlarimizga tayanib, menga hozir eng foydali bolishi mumkin bolgan maslahat yoki gapni ayt.'
+            });
+        }
+
         const el = document.getElementById('quick-prompts-list');
         if (!el) return;
 
