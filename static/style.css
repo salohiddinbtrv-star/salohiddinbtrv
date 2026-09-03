@@ -625,6 +625,96 @@ html, body {
 .reaction-option:hover { transform: scale(1.25); background: var(--hover); }
 .reaction-option:active { transform: scale(1.05); }
 
+/* ---------- AI BOGLANISH DARAJASI (Bond badge) ---------- */
+.bond-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--accent-soft); border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 10px 5px 8px; cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+    max-width: 150px;
+}
+.bond-badge:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.bond-badge:active { transform: scale(0.96); }
+#bond-badge-emoji { font-size: 14px; line-height: 1; }
+.bond-badge-title {
+    font-size: 11.5px; font-weight: 600; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 74px;
+}
+.bond-badge-bar {
+    width: 26px; height: 4px; border-radius: 3px; background: var(--border);
+    overflow: hidden; flex-shrink: 0;
+}
+.bond-badge-fill {
+    height: 100%; background: var(--bubble-gradient); border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+.bond-modal { text-align: center; }
+.bond-modal-body { display: flex; flex-direction: column; align-items: center; padding: 6px 4px 2px; }
+.bond-modal-emoji { font-size: 44px; line-height: 1; margin-bottom: 8px; }
+.bond-modal-title { font-family: var(--font-display); font-size: 19px; font-weight: 700; color: var(--ink); }
+.bond-modal-sub { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; margin-bottom: 14px; }
+.bond-modal-bar {
+    width: 100%; height: 8px; border-radius: 6px; background: var(--border);
+    overflow: hidden;
+}
+.bond-modal-fill {
+    height: 100%; background: var(--bubble-gradient); border-radius: 6px;
+    transition: width 0.5s ease;
+}
+.bond-modal-progress-text { font-size: 12px; color: var(--ink-soft); margin-top: 8px; margin-bottom: 4px; }
+
+/* ---------- DARAJA OSHDI TOASTI ---------- */
+.bond-levelup-toast {
+    position: fixed; top: 18px; left: 50%; transform: translateX(-50%) translateY(-14px);
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel); border: 1px solid var(--accent);
+    box-shadow: var(--shadow-lg); border-radius: 16px; padding: 12px 18px;
+    opacity: 0; transition: opacity 0.3s, transform 0.3s;
+    z-index: 200; max-width: 300px;
+}
+.bond-levelup-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.bond-levelup-emoji { font-size: 26px; animation: bond-levelup-pop 0.5s ease; }
+.bond-levelup-title { font-size: 11.5px; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.bond-levelup-sub { font-size: 14.5px; font-weight: 600; color: var(--ink); }
+@keyframes bond-levelup-pop {
+    0% { transform: scale(0.5); }
+    60% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+
+/* ---------- RASM BIRIKTIRISH (AI suhbati) ---------- */
+.attach-image-btn {
+    width: 34px; height: 34px; flex-shrink: 0; border: none; border-radius: 50%;
+    background: transparent; color: var(--ink-soft); display: flex; align-items: center;
+    justify-content: center; cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.attach-image-btn:hover { background: var(--hover); color: var(--accent); }
+
+.image-preview-bar {
+    max-width: 760px; margin: 0 auto 8px; display: flex; align-items: center; gap: 10px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 8px 12px;
+}
+.image-preview-bar img {
+    width: 40px; height: 40px; object-fit: cover; border-radius: 8px; flex-shrink: 0;
+}
+.image-preview-name {
+    flex: 1; font-size: 12.5px; color: var(--ink-soft);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.image-preview-remove {
+    border: none; background: var(--hover); color: var(--ink-soft); cursor: pointer;
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+}
+.image-preview-remove:hover { color: var(--accent); }
+
+.message-image {
+    max-width: 260px; max-height: 260px; border-radius: 14px; display: block;
+    margin-bottom: 4px; box-shadow: var(--shadow-sm); object-fit: cover;
+}
+
 /* ---------- BILDIRISHNOMA TOAST ---------- */
 .notf-toast {
     position: fixed;

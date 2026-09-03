@@ -27,6 +27,7 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 SECRET_KEY = os.getenv("SECRET_KEY", "notfic_secret_key_123")
 AI_MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-20b")
+GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "notfic_admin_2026")
 ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or "").strip().lower()
 AI_NAME = "Notfic"
@@ -39,6 +40,9 @@ ANONYMOUS_MESSAGE_LIMIT = 10
 
 ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 MAX_AVATAR_SIZE = 2 * 1024 * 1024
+
+ALLOWED_CHAT_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+MAX_CHAT_IMAGE_SIZE = 4 * 1024 * 1024
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///notfic.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -98,6 +102,7 @@ class User(db.Model):
     onboarding_seen = db.Column(db.Boolean, default=False)
     streak_count = db.Column(db.Integer, default=0)
     last_active_date = db.Column(db.Date, nullable=True)
+    ai_bond_xp = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -218,8 +223,24 @@ class AdminAuditLog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+def run_light_migrations():
+    """Eski bazalarga yangi ustunlarni (masalan ai_bond_xp) xavfsiz qoshib qoyadi. SQLite va Postgres'da ishlaydi."""
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(db.engine)
+        cols = [c['name'] for c in inspector.get_columns('users')]
+        if 'ai_bond_xp' not in cols:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN ai_bond_xp INTEGER DEFAULT 0"))
+                conn.commit()
+            logger.info("Migratsiya: users.ai_bond_xp ustuni qoshildi.")
+    except Exception as e:
+        logger.warning(f"Migratsiya tekshiruvi otkazib yuborildi: {e}")
+
+
 with app.app_context():
     db.create_all()
+    run_light_migrations()
 
 
 SERVER_START_TIME = datetime.utcnow()
@@ -291,19 +312,132 @@ def get_user_ai_style_notes(user):
     return "Foydalanuvchi haqida: " + " ".join(notes)
 
 
-def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None) -> str:
+# ---------- BOG'LANISH DARAJASI (AI Bond System) ----------
+# Foydalanuvchi AI bilan qancha kop suhbatlashsa, AI'ning ohangi va
+# "yaqinlik darajasi" shuncha rivojlanib boradi — ChatGPT/Gemini'da yoq,
+# doim bir xil "begona" ohangda gapiradigan assistentdan farqli xususiyat.
+BOND_LEVELS = [
+    (0,   "Notanish",             "🌱"),
+    (5,   "Tanish",                "👋"),
+    (15,  "Suhbatdosh",            "💬"),
+    (30,  "Ishonchli suhbatdosh",  "🤝"),
+    (50,  "Do'st",                 "😊"),
+    (80,  "Yaqin do'st",           "✨"),
+    (120, "Sirdosh",               "🔥"),
+    (180, "Qadrdon",               "🌟"),
+    (260, "Notfic oilasi a'zosi",  "💎"),
+    (360, "Afsonaviy hamroh",      "👑"),
+]
+
+
+def get_bond_info(user):
+    """Foydalanuvchi bilan AI orasidagi boglanish darajasini hisoblab qaytaradi."""
+    if not user:
+        return None
+
+    xp = user.ai_bond_xp or 0
+    level_index = 0
+    for i, (threshold, _title, _emoji) in enumerate(BOND_LEVELS):
+        if xp >= threshold:
+            level_index = i
+        else:
+            break
+
+    threshold, title, emoji = BOND_LEVELS[level_index]
+    is_max = level_index == len(BOND_LEVELS) - 1
+
+    if is_max:
+        next_threshold = threshold
+        progress = 100
+    else:
+        next_threshold = BOND_LEVELS[level_index + 1][0]
+        span = next_threshold - threshold
+        progress = int(((xp - threshold) / span) * 100) if span else 100
+
+    return {
+        "level": level_index + 1,
+        "title": title,
+        "emoji": emoji,
+        "xp": xp,
+        "next_threshold": next_threshold,
+        "progress": max(0, min(progress, 100)),
+        "is_max": is_max
+    }
+
+
+def get_bond_prompt_note(user):
+    """Boglanish darajasiga qarab AI'ning ohangi va samimiylik darajasini moslashtiradi."""
+    info = get_bond_info(user)
+    if not info:
+        return ""
+
+    level = info["level"]
+    name = (user.name or "").split(" ")[0] if user and user.name else ""
+
+    if level <= 1:
+        return "Foydalanuvchi bilan hali yangi tanishyapsiz — muloyim, iliq, biroz odob bilan gaplashing."
+    elif level == 2:
+        return (f"{name} siz bilan tez-tez yozadi, allaqachon tanishsiz. "
+                "Biroz erkinroq va samimiyroq muomala qiling.")
+    elif level == 3:
+        return (f"Siz {name} bilan muntazam suhbatlashasiz — suhbatdosh sifatida qiziqish bilan, "
+                "kerak bolganda mavzuni chuqurlashtiruvchi savol berib gapiring.")
+    elif level == 4:
+        return (f"{name} sizga ancha ishonadi. Ishonchli suhbatdosh sifatida ochiqroq, "
+                "foydali va tabiiy hazil bilan javob bering.")
+    elif level == 5:
+        return (f"Siz va {name} allaqachon dostsiz. Dostona, erkin, rasmiyatchiliksiz — "
+                "xuddi yaqin dostingizga yozayotgandek gaplashing.")
+    elif level == 6:
+        return (f"{name} bilan yaqin dostsiz, uni yaxshi bilasiz. Samimiy, quvvatlovchi, "
+                "kerak bolsa hazillashuvchi ohangda, lekin doim rostgoy boling.")
+    elif level == 7:
+        return (f"{name} sizga sirdosh sifatida qaraydi. Chuqur ishonch bilan, sunʼiy tuyulmaydigan, "
+                "chin dildan qiziquvchan ohangda javob bering.")
+    else:
+        return (f"{name} siz bilan uzoq vaqtdan beri muntazam gaplashadi — siz uning eng ishonchli "
+                "raqamli hamrohisiz. Iliq, hazil-mutoyibali va chuqur samimiy ohangda, "
+                "lekin doim halol va foydali boling.")
+
+
+def register_ai_interaction(user):
+    """Har bir shaxsiy AI xabaridan song boglanish XP'sini oshiradi va daraja ortganini aniqlaydi."""
+    if not user:
+        return None, False
+
+    before = get_bond_info(user)
+    user.ai_bond_xp = (user.ai_bond_xp or 0) + 1
+    db.session.commit()
+    after = get_bond_info(user)
+
+    leveled_up = after["level"] > before["level"]
+    return after, leveled_up
+
+
+def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None, image_data_uri=None) -> str:
     if not ai_client:
         return f"{AI_NAME}: Hozircha ulanmagan — server tomonida API kalit sozlanmagan."
+
+    if (not prompt or not prompt.strip()) and image_data_uri:
+        prompt = "Bu rasmda nima borligini tasvirlab ber va u haqida qiziqarli fikr bildir."
 
     if not prompt or not prompt.strip():
         return f"{AI_NAME}: Savolingizni yozing, men yordam berishga tayyorman!"
 
     style_notes = get_user_ai_style_notes(user)
+    bond_note = get_bond_prompt_note(user)
     system_content = SYSTEM_PROMPT
+    if bond_note:
+        system_content += " " + bond_note
     if style_notes:
         system_content += " " + style_notes
     if extra_system_note:
         system_content += " " + extra_system_note
+    if image_data_uri:
+        system_content += (
+            " Foydalanuvchi sizga rasm yubordi. Rasmni diqqat bilan tahlil qilib, "
+            "aniq va foydali javob bering."
+        )
 
     messages = [{"role": "system", "content": system_content}]
 
@@ -314,11 +448,22 @@ def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None
             if text:
                 messages.append({"role": role, "content": text})
 
-    messages.append({"role": "user", "content": prompt.strip()})
+    if image_data_uri:
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt.strip()},
+                {"type": "image_url", "image_url": {"url": image_data_uri}}
+            ]
+        })
+        model_to_use = GROQ_VISION_MODEL
+    else:
+        messages.append({"role": "user", "content": prompt.strip()})
+        model_to_use = AI_MODEL
 
     try:
         completion = ai_client.chat.completions.create(
-            model=AI_MODEL,
+            model=model_to_use,
             messages=messages,
             temperature=0.7,
             max_tokens=1024
@@ -327,7 +472,9 @@ def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None
 
     except Exception as e:
         logger.error(f"Groq AI xatosi: {e}")
-        return f"{AI_NAME}: Hozir javob bera olmadim, birozdan so'ng qayta urinib ko'ring."
+        if image_data_uri:
+            return f"{AI_NAME}: Rasmni tahlil qila olmadim, birozdan song qayta urinib koring."
+        return f"{AI_NAME}: Hozir javob bera olmadim, birozdan song qayta urinib koring."
 
 
 def current_user():
@@ -1104,6 +1251,15 @@ def api_my_activity():
     })
 
 
+@app.route('/api/ai/bond')
+def api_ai_bond():
+    user = current_user()
+    info = get_bond_info(user)
+    if not info:
+        return jsonify({"logged_in": False})
+    return jsonify(dict(info, logged_in=True))
+
+
 @app.route('/api/quick-prompts')
 def api_quick_prompts():
     return jsonify([
@@ -1540,8 +1696,23 @@ def handle_ai_message(data):
     msg = (data.get('message') or '').strip()[:2000]
     client_id = data.get('clientId')
     context = data.get('context') or []
+    image_data_uri = data.get('image')
 
-    if not msg:
+    if image_data_uri:
+        if not isinstance(image_data_uri, str) or not image_data_uri.startswith('data:image/'):
+            image_data_uri = None
+        else:
+            mime = image_data_uri.split(';')[0].replace('data:', '')
+            if mime not in ALLOWED_CHAT_IMAGE_TYPES:
+                image_data_uri = None
+            elif len(image_data_uri) > MAX_CHAT_IMAGE_SIZE * 1.4:
+                emit('ai_response_message', {
+                    'username': AI_NAME, 'message': f"{AI_NAME}: Rasm hajmi juda katta (4MB dan oshmasin).",
+                    'isAI': True
+                })
+                return
+
+    if not msg and not image_data_uri:
         return
 
     if not is_logged_in_session():
@@ -1556,15 +1727,22 @@ def handle_ai_message(data):
         emit('anon_limit_update', {'remaining': remaining})
 
     stats["total_ai_messages"] += 1
-    logger.info(f"[AI-shaxsiy] {username}: {msg}")
+    logger.info(f"[AI-shaxsiy] {username}: {msg}{' [+rasm]' if image_data_uri else ''}")
 
-    emit('ai_response_message', {'username': username, 'message': msg, 'isAI': False, 'clientId': client_id})
+    emit('ai_response_message', {
+        'username': username, 'message': msg, 'isAI': False, 'clientId': client_id,
+        'image': image_data_uri
+    })
 
     emit('ai_typing', {'typing': True})
     user = current_user()
-    ai_reply = get_ai_response(msg, context, user=user)
+    ai_reply = get_ai_response(msg, context, user=user, image_data_uri=image_data_uri)
     emit('ai_typing', {'typing': False})
     emit('ai_response_message', {'username': AI_NAME, 'message': ai_reply, 'isAI': True, 'prompt': msg})
+
+    if user:
+        bond_info, leveled_up = register_ai_interaction(user)
+        emit('bond_update', dict(bond_info, leveled_up=leveled_up))
 
 
 @socketio.on('public_message')

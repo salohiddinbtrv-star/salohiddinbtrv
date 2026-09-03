@@ -19,6 +19,94 @@ let lastRenderedKey = null;
 let cachedFriendsList = [];
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢'];
 
+/* ---------- RASM BIRIKTIRISH (AI suhbatiga) ---------- */
+const MAX_CHAT_IMAGE_SIZE = 4 * 1024 * 1024;
+let attachedImageDataUri = null;
+
+function handleImageAttach(event) {
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        showNotificationToast("Faqat JPG, PNG yoki WEBP formatlariga ruxsat berilgan");
+        return;
+    }
+    if (file.size > MAX_CHAT_IMAGE_SIZE) {
+        showNotificationToast("Rasm hajmi 4MB dan katta bolmasligi kerak");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        attachedImageDataUri = e.target.result;
+        document.getElementById('image-preview-thumb').src = attachedImageDataUri;
+        document.getElementById('image-preview-name').textContent = file.name.length > 24 ? file.name.slice(0, 24) + '…' : file.name;
+        document.getElementById('image-preview-bar').style.display = 'flex';
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearAttachedImage() {
+    attachedImageDataUri = null;
+    document.getElementById('image-preview-bar').style.display = 'none';
+    document.getElementById('image-preview-thumb').src = '';
+}
+
+/* ---------- AI BOGLANISH DARAJASI (Bond) ---------- */
+let currentBondInfo = null;
+
+function renderBondBadge(info) {
+    const badge = document.getElementById('bond-badge');
+    if (!info || !info.logged_in) {
+        badge.style.display = 'none';
+        return;
+    }
+    currentBondInfo = info;
+    badge.style.display = (currentChatKind() === 'ai') ? 'flex' : 'none';
+    document.getElementById('bond-badge-emoji').textContent = info.emoji;
+    document.getElementById('bond-badge-title').textContent = info.title;
+    document.getElementById('bond-badge-fill').style.width = info.progress + '%';
+}
+
+function refreshBondInfoFromServer() {
+    if (!IS_LOGGED_IN) return;
+    fetch('/api/ai/bond')
+        .then(function (r) { return r.json(); })
+        .then(function (data) { renderBondBadge(data); })
+        .catch(function () {});
+}
+
+function openBondModal() {
+    if (!currentBondInfo) return;
+    document.getElementById('bond-modal-emoji').textContent = currentBondInfo.emoji;
+    document.getElementById('bond-modal-title').textContent = currentBondInfo.title;
+    document.getElementById('bond-modal-sub').textContent = 'Daraja ' + currentBondInfo.level;
+    document.getElementById('bond-modal-fill').style.width = currentBondInfo.progress + '%';
+    document.getElementById('bond-modal-progress-text').textContent = currentBondInfo.is_max
+        ? "Eng yuqori darajaga yetdingiz! 👑"
+        : (currentBondInfo.next_threshold - currentBondInfo.xp) + " ta xabar qoldi keyingi darajagacha";
+    document.getElementById('bond-modal').classList.add('open');
+}
+
+function closeBondModal() {
+    document.getElementById('bond-modal').classList.remove('open');
+}
+
+function showBondLevelUpToast(info) {
+    const toast = document.createElement('div');
+    toast.className = 'bond-levelup-toast';
+    toast.innerHTML = '<div class="bond-levelup-emoji">' + info.emoji + '</div>' +
+        '<div><div class="bond-levelup-title">Yangi daraja!</div>' +
+        '<div class="bond-levelup-sub">' + escapeHtml(info.title) + '</div></div>';
+    document.body.appendChild(toast);
+    setTimeout(function () { toast.classList.add('show'); }, 10);
+    setTimeout(function () {
+        toast.classList.remove('show');
+        setTimeout(function () { toast.remove(); }, 400);
+    }, 4200);
+}
+
 /* ---------- MOBIL BALANDLIK TUZATISH ---------- */
 function setViewportHeight() {
     document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
@@ -94,12 +182,16 @@ function updateHeader() {
         document.getElementById('public-chat-item').classList.add('active');
     } else {
         const activeId = getActiveChatId();
-        if (activeId.indexOf('friend_') === 0) return;
+        if (activeId.indexOf('friend_') === 0) {
+            renderBondBadge(currentBondInfo);
+            return;
+        }
         const chats = loadChats();
         const chat = chats[activeId];
         chatHeaderTitle.textContent = '🤖 ' + (chat ? chat.title : 'AI suhbat');
         document.getElementById('public-chat-item').classList.remove('active');
     }
+    renderBondBadge(currentBondInfo);
 }
 
 /* ---------- AI SUHBATLAR RO'YXATI (yigiladigan) ---------- */
@@ -385,12 +477,15 @@ function appendMessageToDOM(data, animate) {
 
     const feedbackHtml = data.isAI ? buildFeedbackHtml(data) : '';
     const reactionHtml = (!data.isAI && data.id) ? buildReactionHtml(data) : '';
+    const imageHtml = data.image ? '<img class="message-image" src="' + data.image + '" alt="Yuborilgan rasm">' : '';
+    const textHtml = data.message ? '<div class="message">' + escapeHtml(data.message) + '</div>' : '';
 
     row.innerHTML =
         avatarHtml +
         '<div class="message-bubble-wrap">' +
             nameHtml +
-            '<div class="message">' + escapeHtml(data.message) + '</div>' +
+            imageHtml +
+            textHtml +
             feedbackHtml +
             reactionHtml +
         '</div>';
@@ -575,6 +670,15 @@ socket.on('ai_response_message', function (data) {
     }
     updateHeader();
     showBrowserNotification('Notfic', data.message.slice(0, 100));
+});
+
+socket.on('bond_update', function (data) {
+    const hadPrevious = !!currentBondInfo;
+    data.logged_in = true;
+    renderBondBadge(data);
+    if (data.leveled_up && hadPrevious) {
+        showBondLevelUpToast(data);
+    }
 });
 
 socket.on('ai_typing', function (data) {
@@ -1129,14 +1233,17 @@ function sendMessage() {
         : (usernameInput.value.trim() || 'Anonim');
 
     const message = messageInput.value.trim();
+    const imageToSend = attachedImageDataUri;
 
-    if (message === '') return;
+    if (message === '' && !imageToSend) return;
 
     const activeId = getActiveChatId();
     const clientId = 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     sentMessageIds.add(clientId);
 
     if (activeId.indexOf('friend_') === 0) {
+        if (message === '') return;
+        if (imageToSend) { showNotificationToast('Rasm hozircha faqat AI suhbatida ishlaydi'); clearAttachedImage(); }
         const friendId = parseInt(activeId.replace('friend_', ''), 10);
         clearEmptyState();
         const myAvatar = document.getElementById('sidebar-avatar-img');
@@ -1154,6 +1261,8 @@ function sendMessage() {
     }
 
     if (activeId.indexOf('group_') === 0) {
+        if (message === '') return;
+        if (imageToSend) { showNotificationToast('Rasm hozircha faqat AI suhbatida ishlaydi'); clearAttachedImage(); }
         const groupId = parseInt(activeId.replace('group_', ''), 10);
         clearEmptyState();
         const myAvatar = document.getElementById('sidebar-avatar-img');
@@ -1173,41 +1282,49 @@ function sendMessage() {
     const myAvatarEl = document.getElementById('sidebar-avatar-img');
     const myAvatar = (myAvatarEl && myAvatarEl.tagName === 'IMG') ? myAvatarEl.src : null;
 
-    const localData = { username: username, message: message, avatar: myAvatar, isAI: false, isMine: true, clientId: clientId };
+    if (isPublicActive()) {
+        if (message === '') return;
+        if (imageToSend) { showNotificationToast('Rasm hozircha faqat AI suhbatida ishlaydi'); clearAttachedImage(); }
+        const localData = { username: username, message: message, avatar: myAvatar, isAI: false, isMine: true, clientId: clientId };
+        clearEmptyState();
+        appendMessageToDOM(localData, true);
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+        const history = loadPublicHistory();
+        history.push(localData);
+        savePublicHistory(history);
+        socket.emit('public_message', { username: username, message: message, clientId: clientId });
+        messageInput.value = '';
+        return;
+    }
+
+    const localData = { username: username, message: message, avatar: myAvatar, isAI: false, isMine: true, clientId: clientId, image: imageToSend || undefined };
 
     clearEmptyState();
     appendMessageToDOM(localData, true);
     messagesBox.scrollTop = messagesBox.scrollHeight;
 
-    if (isPublicActive()) {
-        const history = loadPublicHistory();
-        history.push(localData);
-        savePublicHistory(history);
-        socket.emit('public_message', { username: username, message: message, clientId: clientId });
-    } else {
-        const chats = loadChats();
-        let chatId = activeId;
-        if (!chats[chatId]) {
-            chatId = 'chat_' + Date.now();
-            chats[chatId] = { id: chatId, title: 'Yangi AI suhbat', messages: [] };
-            setActiveChatId(chatId);
-        }
-        const chat = chats[chatId];
-
-        // AI'ga oldingi xabarlarni kontekst sifatida yuboramiz (oxirgi 14 tasi)
-        const context = chat.messages.slice(-14);
-
-        chat.messages.push(localData);
-        if (chat.title === 'Yangi AI suhbat') {
-            chat.title = message.slice(0, 28) + (message.length > 28 ? '...' : '');
-        }
-        saveChats(chats);
-        renderChatList();
-        updateHeader();
-
-        socket.emit('ai_message', { username: username, message: message, clientId: clientId, context: context });
+    const chats = loadChats();
+    let chatId = activeId;
+    if (!chats[chatId]) {
+        chatId = 'chat_' + Date.now();
+        chats[chatId] = { id: chatId, title: 'Yangi AI suhbat', messages: [] };
+        setActiveChatId(chatId);
     }
+    const chat = chats[chatId];
 
+    // AI'ga oldingi xabarlarni kontekst sifatida yuboramiz (oxirgi 14 tasi)
+    const context = chat.messages.slice(-14);
+
+    chat.messages.push(localData);
+    if (chat.title === 'Yangi AI suhbat') {
+        chat.title = (message || '📷 Rasm').slice(0, 28) + (message.length > 28 ? '...' : '');
+    }
+    saveChats(chats);
+    renderChatList();
+    updateHeader();
+
+    socket.emit('ai_message', { username: username, message: message, clientId: clientId, context: context, image: imageToSend || null });
+    clearAttachedImage();
     messageInput.value = '';
 }
 
@@ -2657,5 +2774,6 @@ window.addEventListener('DOMContentLoaded', function() {
         loadFriendRequests();
         // Push orqali real-vaqt bildirishnomalar keladi; bu faqat zaxira uchun
         setInterval(loadFriendRequests, 60000);
+        refreshBondInfoFromServer();
     }
 });

@@ -122,6 +122,11 @@
                 </button>
                 <span id="chat-header-title">💬 Ochiq Suhbat</span>
                 <div class="chat-header-right">
+                    <div id="bond-badge" class="bond-badge" style="display:none" onclick="openBondModal()" title="AI bilan boglanish darajangiz">
+                        <span id="bond-badge-emoji">🌱</span>
+                        <span id="bond-badge-title" class="bond-badge-title">Notanish</span>
+                        <div class="bond-badge-bar"><div id="bond-badge-fill" class="bond-badge-fill"></div></div>
+                    </div>
                     <span id="anon-limit-badge" class="anon-limit-badge" style="display:none"></span>
                     <button class="support-shield-btn" onclick="openCommandPalette()" aria-label="Buyruqlar paneli" title="Buyruqlar paneli (Ctrl+K)">
                         <kbd class="cmdk-hint">⌘K</kbd>
@@ -139,7 +144,16 @@
             <div id="messages-box" class="messages-box"></div>
 
             <footer class="input-row">
+                <div id="image-preview-bar" class="image-preview-bar" style="display:none">
+                    <img id="image-preview-thumb" src="" alt="Tanlangan rasm">
+                    <span id="image-preview-name" class="image-preview-name"></span>
+                    <button type="button" class="image-preview-remove" onclick="clearAttachedImage()" aria-label="Rasmni olib tashlash">✕</button>
+                </div>
                 <div class="input-shell">
+                    <input type="file" id="chat-image-input" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="handleImageAttach(event)">
+                    <button type="button" id="attach-image-btn" class="attach-image-btn" onclick="document.getElementById('chat-image-input').click()" aria-label="Rasm biriktirish" title="Rasm biriktirish">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 15V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8.5" cy="9.5" r="1.5" stroke="currentColor" stroke-width="1.7"/><path d="M3 16l5-5 4 4M16 22l4-4 3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
                     <input type="text" id="message-input" placeholder="Xabaringizni yozing..." onkeypress="if(event.key==='Enter') sendMessage()">
                     <button onclick="sendMessage()" class="send-btn" aria-label="Yuborish">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -150,6 +164,24 @@
             </footer>
         </main>
 
+    </div>
+
+    <!-- BOGLANISH DARAJASI MODAL -->
+    <div id="bond-modal" class="modal-overlay" onclick="if(event.target===this) closeBondModal()">
+        <div class="modal bond-modal">
+            <div class="modal-header">
+                <h3>AI bilan boglanishingiz</h3>
+                <button class="modal-close" onclick="closeBondModal()">X</button>
+            </div>
+            <div class="bond-modal-body">
+                <div id="bond-modal-emoji" class="bond-modal-emoji">🌱</div>
+                <div id="bond-modal-title" class="bond-modal-title">Notanish</div>
+                <div id="bond-modal-sub" class="bond-modal-sub">Daraja 1</div>
+                <div class="bond-modal-bar"><div id="bond-modal-fill" class="bond-modal-fill"></div></div>
+                <div id="bond-modal-progress-text" class="bond-modal-progress-text"></div>
+                <p class="section-hint-light">Notfic bilan qancha kop suhbatlashsangiz, u sizni shuncha yaxshi tanib, ohangi ham shunga qarab yaqinlashib boradi — o'z xarakteriga ega yordamchi.</p>
+            </div>
+        </div>
     </div>
 
     <!-- SOZLAMALAR MODAL -->
