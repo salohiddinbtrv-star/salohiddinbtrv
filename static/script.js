@@ -9,6 +9,7 @@ const ACTIVE_KEY = 'notfic_active_chat';
 const THEME_KEY = 'notfic_theme';
 const PUBLIC_ID = 'public';
 const PUBLIC_STORAGE_KEY = 'notfic_public_history';
+const CODE_CHAT_ID = 'code_main';
 
 const IS_LOGGED_IN = document.body.getAttribute('data-logged-in') === 'true';
 const ANON_LIMIT = parseInt(document.body.getAttribute('data-anon-limit') || '10', 10);
@@ -206,13 +207,34 @@ function switchToPublic() {
     closeSidebar();
 }
 
+function switchToCodeChat() {
+    const chats = loadChats();
+    if (!chats[CODE_CHAT_ID]) {
+        chats[CODE_CHAT_ID] = { id: CODE_CHAT_ID, title: '💻 Kod yordamchisi', messages: [] };
+        saveChats(chats);
+    }
+    setActiveChatId(CODE_CHAT_ID);
+    renderChatList();
+    renderMessages();
+    updateHeader();
+    closeSidebar();
+}
+
 function updateHeader() {
+    document.getElementById('code-chat-item').classList.remove('active');
     if (isPublicActive()) {
         chatHeaderTitle.textContent = '💬 Ochiq Suhbat';
         document.getElementById('public-chat-item').classList.add('active');
     } else {
         const activeId = getActiveChatId();
         if (activeId.indexOf('friend_') === 0) {
+            renderBondBadge(currentBondInfo);
+            return;
+        }
+        if (activeId === CODE_CHAT_ID) {
+            chatHeaderTitle.textContent = '💻 Kod yordamchisi';
+            document.getElementById('public-chat-item').classList.remove('active');
+            document.getElementById('code-chat-item').classList.add('active');
             renderBondBadge(currentBondInfo);
             return;
         }
@@ -306,7 +328,8 @@ function deleteAIChat(chatId) {
 function renderChatList() {
     const chats = loadChats();
     const activeId = getActiveChatId();
-    const ids = Object.keys(chats).sort(function(a, b) { return b.localeCompare(a); });
+    const ids = Object.keys(chats).filter(function (id) { return id !== CODE_CHAT_ID; })
+        .sort(function(a, b) { return b.localeCompare(a); });
 
     chatList.innerHTML = '';
     const toggleBtn = document.getElementById('chat-list-toggle-btn');
@@ -390,7 +413,10 @@ function renderMessages() {
         const chats = loadChats();
         const chat = chats[activeId];
         if (!chat || chat.messages.length === 0) {
-            messagesBox.innerHTML = '<div class="empty-state"><h2>Nima bilan yordam beray?</h2><p>Bu suhbat faqat sizga korinadi.</p></div>';
+            const emptyHtml = (activeId === CODE_CHAT_ID)
+                ? '<div class="empty-state"><h2>💻 Kod yordamchisi</h2><p>Loyihangiz, xatoligingiz yoki yozmoqchi bolgan dasturingiz haqida yozing — men Claude uslubida toliq, ishlaydigan va tushuntirilgan kod yozib beraman.</p></div>'
+                : '<div class="empty-state"><h2>Nima bilan yordam beray?</h2><p>Bu suhbat faqat sizga korinadi.</p></div>';
+            messagesBox.innerHTML = emptyHtml;
             playChatSwitchAnimation();
             return;
         }
@@ -569,7 +595,7 @@ function appendMessageToDOM(data, animate) {
     const feedbackHtml = data.isAI ? buildFeedbackHtml(data) : '';
     const reactionHtml = (!data.isAI && data.id) ? buildReactionHtml(data) : '';
     const imageHtml = data.image ? '<img class="message-image" src="' + data.image + '" alt="Yuborilgan rasm">' : '';
-    const textHtml = data.message ? '<div class="message">' + escapeHtml(data.message) + '</div>' : '';
+    const textHtml = data.message ? '<div class="message"></div>' : '';
 
     row.innerHTML =
         avatarHtml +
@@ -581,7 +607,108 @@ function appendMessageToDOM(data, animate) {
             reactionHtml +
         '</div>';
 
+    if (data.message) {
+        const msgEl = row.querySelector('.message');
+        if (data.isAI) {
+            renderAIRichText(msgEl, data.message);
+        } else {
+            msgEl.innerHTML = formatInlineMarkdown(data.message);
+        }
+    }
+
     messagesBox.appendChild(row);
+}
+
+/* ---------- CLAUDE'GA OXSHASH KOD BLOKLARI VA MARKDOWN RENDERI ---------- */
+function formatInlineMarkdown(text) {
+    let escaped = escapeHtml(text);
+    escaped = escaped.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
+    escaped = escaped.replace(/\*\*([^\*\n]+)\*\*/g, '<strong>$1</strong>');
+    return escaped.replace(/\n/g, '<br>');
+}
+
+let codeBlockCounter = 0;
+
+function renderAIRichText(container, text) {
+    container.innerHTML = '';
+    const fenceRegex = /```(\w*)\n?([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+    let foundBlock = false;
+
+    while ((match = fenceRegex.exec(text)) !== null) {
+        foundBlock = true;
+        if (match.index > lastIndex) {
+            const plain = text.slice(lastIndex, match.index);
+            if (plain.trim()) {
+                const p = document.createElement('div');
+                p.className = 'ai-text-segment';
+                p.innerHTML = formatInlineMarkdown(plain.trim());
+                container.appendChild(p);
+            }
+        }
+
+        const lang = (match[1] || '').toLowerCase();
+        const code = match[2].replace(/\n$/, '');
+        const blockId = 'codeblk_' + Date.now() + '_' + (codeBlockCounter++);
+
+        const block = document.createElement('div');
+        block.className = 'code-block';
+        block.innerHTML =
+            '<div class="code-block-header">' +
+                '<span class="code-lang">' + escapeHtml(lang || 'kod') + '</span>' +
+                '<button type="button" class="code-copy-btn" onclick="copyCodeBlock(\'' + blockId + '\', this)">📋 Nusxa olish</button>' +
+            '</div>' +
+            '<pre><code id="' + blockId + '" class="hljs' + (lang ? ' language-' + lang : '') + '"></code></pre>';
+        container.appendChild(block);
+
+        const codeEl = block.querySelector('code');
+        codeEl.textContent = code;
+        if (window.hljs) {
+            try { window.hljs.highlightElement(codeEl); } catch (e) { /* highlight ishlamasa ham kod korinib turadi */ }
+        }
+
+        lastIndex = fenceRegex.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+        const rest = text.slice(lastIndex);
+        if (rest.trim()) {
+            const p = document.createElement('div');
+            p.className = 'ai-text-segment';
+            p.innerHTML = formatInlineMarkdown(rest.trim());
+            container.appendChild(p);
+        }
+    }
+
+    if (!foundBlock && container.children.length === 0) {
+        container.innerHTML = formatInlineMarkdown(text);
+    }
+}
+
+function copyCodeBlock(id, btn) {
+    const codeEl = document.getElementById(id);
+    if (!codeEl) return;
+    const text = codeEl.textContent;
+    const done = function () {
+        const original = btn.textContent;
+        btn.textContent = '✅ Nusxalandi';
+        btn.classList.add('copied');
+        setTimeout(function () {
+            btn.textContent = original;
+            btn.classList.remove('copied');
+        }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () {});
+    } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) {}
+        ta.remove();
+    }
 }
 
 function escapeHtml(str) {
@@ -824,7 +951,7 @@ socket.on('ai_stream_done', function (data) {
         const msgDiv = activeStreamRow.querySelector('.stream-message');
         if (msgDiv) {
             msgDiv.classList.remove('stream-message');
-            msgDiv.innerHTML = escapeHtml(data.message);
+            renderAIRichText(msgDiv, data.message);
         }
         if (wrap) {
             wrap.insertAdjacentHTML('beforeend', buildFeedbackHtml(finalData));
@@ -1485,19 +1612,23 @@ function sendMessage() {
         setActiveChatId(chatId);
     }
     const chat = chats[chatId];
+    const isCodeChat = (chatId === CODE_CHAT_ID);
 
     // AI'ga oldingi xabarlarni kontekst sifatida yuboramiz (oxirgi 14 tasi)
     const context = chat.messages.slice(-14);
 
     chat.messages.push(localData);
-    if (chat.title === 'Yangi AI suhbat') {
+    if (!isCodeChat && chat.title === 'Yangi AI suhbat') {
         chat.title = (message || '📷 Rasm').slice(0, 28) + (message.length > 28 ? '...' : '');
     }
     saveChats(chats);
     renderChatList();
     updateHeader();
 
-    socket.emit('ai_message', { username: username, message: message, clientId: clientId, context: context, image: imageToSend || null });
+    socket.emit('ai_message', {
+        username: username, message: message, clientId: clientId, context: context,
+        image: imageToSend || null, chatType: isCodeChat ? 'code' : undefined
+    });
     clearAttachedImage();
     messageInput.value = '';
 }
