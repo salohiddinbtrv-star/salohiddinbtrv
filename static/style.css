@@ -332,6 +332,21 @@ html, body {
     border-color: var(--accent);
 }
 
+.code-chat-item {
+    justify-content: space-between;
+}
+.code-chat-item-label { display: flex; align-items: center; }
+.code-chat-pro-badge {
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: #fff;
+    background: linear-gradient(135deg, #FFB84D, #FF6B6B);
+    padding: 2px 7px;
+    border-radius: 8px;
+    line-height: 1.4;
+}
+
 .sidebar-footer { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 
 .username-input {
@@ -427,6 +442,55 @@ html, body {
 .empty-state h2 { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
 .empty-state p { font-size: 14px; line-height: 1.5; }
 .ai-hint { font-size: 12px; color: var(--ink-soft); opacity: 0.8; }
+
+/* ---------- KOD BOLIMI BOSH HOLATI ---------- */
+.code-empty-state {
+    max-width: 460px;
+    animation: content-fade-up 0.4s var(--ease-smooth) both;
+}
+.code-empty-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 14px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: var(--shadow-md);
+    animation: code-icon-float 3.2s ease-in-out infinite;
+}
+@keyframes code-icon-float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-6px) rotate(-3deg); }
+}
+
+.code-empty-examples {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.code-example-chip {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--ink);
+    font-size: 12.5px;
+    padding: 9px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: border-color 0.2s var(--ease-smooth), transform 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth), background 0.2s var(--ease-smooth);
+}
+.code-example-chip:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+.code-example-chip:active { transform: scale(0.96); }
 
 .message-row {
     display: flex;
@@ -545,9 +609,15 @@ html, body {
 .ai-text-segment {
     padding: 4px 2px;
     line-height: 1.55;
+    animation: content-fade-up 0.35s var(--ease-smooth) both;
 }
 .ai-text-segment:first-child { padding-top: 0; }
 .ai-text-segment:last-child { padding-bottom: 0; }
+
+@keyframes content-fade-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
 .inline-code {
     background: var(--hover);
@@ -566,6 +636,11 @@ html, body {
     border: 1px solid #2a2f3a;
     background: #1e2128;
     box-shadow: var(--shadow-sm);
+    animation: content-fade-up 0.4s var(--ease-smooth) both;
+    transition: box-shadow 0.25s var(--ease-smooth), transform 0.25s var(--ease-smooth);
+}
+.code-block:hover {
+    box-shadow: var(--shadow-md);
 }
 
 .code-block-header {
@@ -576,6 +651,7 @@ html, body {
     padding: 7px 12px;
     background: #262a33;
     border-bottom: 1px solid #2a2f3a;
+    flex-wrap: wrap;
 }
 
 .code-lang {
@@ -591,6 +667,7 @@ html, body {
 .code-block-actions {
     display: flex;
     gap: 6px;
+    flex-wrap: wrap;
     flex-shrink: 0;
 }
 
@@ -603,14 +680,22 @@ html, body {
     border-radius: 7px;
     cursor: pointer;
     white-space: nowrap;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.2s var(--ease-smooth), color 0.2s var(--ease-smooth), transform 0.15s var(--ease-snappy);
 }
 .code-copy-btn:hover, .code-download-btn:hover {
     background: rgba(255,255,255,0.14);
     color: #fff;
+    transform: translateY(-1px);
 }
+.code-copy-btn:active, .code-download-btn:active { transform: scale(0.92); }
 .code-copy-btn.copied {
     color: #4ADE80;
+    animation: copied-pop 0.3s var(--ease-snappy);
+}
+@keyframes copied-pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.15); }
+    100% { transform: scale(1); }
 }
 
 .code-block pre {
@@ -666,12 +751,35 @@ html, body {
     border-radius: 7px;
     cursor: pointer;
     white-space: nowrap;
+    transition: transform 0.15s var(--ease-snappy), box-shadow 0.2s var(--ease-smooth);
 }
-.code-preview-btn:hover { opacity: 0.9; }
+.code-preview-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(74,222,128,0.35); }
+.code-preview-btn:active { transform: scale(0.94); }
+
+.code-open-browser-btn {
+    border: none;
+    background: rgba(96,165,250,0.16);
+    color: #93C5FD;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s var(--ease-smooth), transform 0.15s var(--ease-snappy);
+}
+.code-open-browser-btn:hover { background: rgba(96,165,250,0.26); transform: translateY(-1px); }
+.code-open-browser-btn:active { transform: scale(0.94); }
 
 .code-preview-wrap {
     border-top: 1px solid #2a2f3a;
     background: #14161b;
+    animation: preview-slide-open 0.3s var(--ease-smooth);
+    transform-origin: top;
+}
+@keyframes preview-slide-open {
+    from { opacity: 0; transform: scaleY(0.92) translateY(-6px); }
+    to { opacity: 1; transform: scaleY(1) translateY(0); }
 }
 .code-preview-toolbar {
     display: flex;
@@ -730,7 +838,19 @@ html, body {
     border: 1px solid rgba(255,255,255,0.06);
     border-radius: 16px;
     padding: 10px 14px;
+    animation: content-fade-up 0.4s var(--ease-smooth) both;
+    transition: transform 0.2s var(--ease-smooth), border-color 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth);
 }
+.file-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.14);
+    box-shadow: var(--shadow-md);
+}
+.file-cards-panel .file-card:nth-child(1) { animation-delay: 0.03s; }
+.file-cards-panel .file-card:nth-child(2) { animation-delay: 0.08s; }
+.file-cards-panel .file-card:nth-child(3) { animation-delay: 0.13s; }
+.file-cards-panel .file-card:nth-child(4) { animation-delay: 0.18s; }
+.file-cards-panel .file-card:nth-child(n+5) { animation-delay: 0.22s; }
 
 .file-card-icon {
     width: 44px;
@@ -798,9 +918,10 @@ html, body {
     padding: 8px 16px;
     border-radius: 10px;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.2s var(--ease-smooth), transform 0.15s var(--ease-snappy);
 }
-.file-card-download:hover { background: rgba(255,255,255,0.16); }
+.file-card-download:hover { background: rgba(255,255,255,0.16); transform: translateY(-1px); }
+.file-card-download:active { transform: scale(0.94); }
 
 .file-cards-zip-btn {
     border: none;
@@ -812,8 +933,12 @@ html, body {
     border-radius: 14px;
     cursor: pointer;
     text-align: center;
+    animation: content-fade-up 0.4s var(--ease-smooth) both;
+    animation-delay: 0.24s;
+    transition: transform 0.2s var(--ease-snappy), box-shadow 0.2s var(--ease-smooth);
 }
-.file-cards-zip-btn:hover { opacity: 0.92; }
+.file-cards-zip-btn:hover { opacity: 0.92; transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.file-cards-zip-btn:active { transform: scale(0.96); }
 
 .msg-enter {
     animation: msg-slide-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -1023,6 +1148,27 @@ html, body {
     justify-content: center; cursor: pointer; transition: background 0.15s, color 0.15s;
 }
 .attach-image-btn:hover { background: var(--hover); color: var(--accent); }
+
+/* ---------- OVOZLI KIRITISH TUGMASI ---------- */
+.voice-input-btn {
+    width: 34px; height: 34px; flex-shrink: 0; border: none; border-radius: 50%;
+    background: transparent; color: var(--ink-soft); display: flex; align-items: center;
+    justify-content: center; cursor: pointer;
+    transition: background 0.2s var(--ease-smooth), color 0.2s var(--ease-smooth), transform 0.15s var(--ease-snappy);
+}
+.voice-input-btn:hover { background: var(--hover); color: var(--accent); }
+.voice-input-btn:active { transform: scale(0.9); }
+
+.voice-input-btn.recording {
+    background: #EF4444;
+    color: #fff;
+    animation: voice-recording-pulse 1.4s infinite ease-in-out;
+}
+
+@keyframes voice-recording-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+    50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+}
 
 .image-preview-bar {
     max-width: 760px; margin: 0 auto 8px; display: flex; align-items: center; gap: 10px;
@@ -1415,7 +1561,7 @@ html, body {
 .typing-dots span {
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--accent); opacity: 0.4;
-    animation: typing-bounce 1.2s infinite ease-in-out;
+    animation: typing-bounce 1.3s infinite cubic-bezier(0.45, 0, 0.55, 1);
 }
 
 .typing-dots span:nth-child(2) { animation-delay: 0.2s; }

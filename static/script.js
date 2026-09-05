@@ -55,6 +55,113 @@ function clearAttachedImage() {
     document.getElementById('image-preview-thumb').src = '';
 }
 
+/* ---------- OVOZLI KIRITISH (Push-to-talk) — ChatGPT uslubidagi mikrofon tugmasi ---------- */
+let pushToTalkRecognition = null;
+let pushToTalkActive = false;
+let pushToTalkFinalText = '';
+let pushToTalkSilenceTimer = null;
+let wasWakeWordActiveBeforePTT = false;
+let autoSpeakNextAIReply = false;
+const PUSH_TO_TALK_SILENCE_MS = 1600;
+
+function togglePushToTalk() {
+    if (pushToTalkActive) {
+        stopPushToTalk(true);
+    } else {
+        startPushToTalk();
+    }
+}
+
+function startPushToTalk() {
+    if (!isVoiceAssistantSupported()) {
+        showNotificationToast("Brauzeringiz ovozli kiritishni qollab-quvvatlamaydi. Chrome yoki Edge'dan foydalaning.");
+        return;
+    }
+
+    // Doimiy tinglovchi ("Hey Notfic") ishlab tursa, ikkalasi bir vaqtda ishlay olmaydi —
+    // vaqtincha tokhtatib turamiz, tugagach qayta yoqamiz.
+    wasWakeWordActiveBeforePTT = voiceAssistantActive;
+    if (voiceAssistantActive) stopVoiceListening();
+
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    pushToTalkRecognition = new SpeechRecognitionCtor();
+    pushToTalkRecognition.lang = 'uz-UZ';
+    pushToTalkRecognition.continuous = true;
+    pushToTalkRecognition.interimResults = true;
+    pushToTalkRecognition.maxAlternatives = 1;
+    pushToTalkFinalText = '';
+
+    pushToTalkRecognition.onresult = function (event) {
+        let interim = '';
+        let finalChunk = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const chunk = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalChunk += chunk;
+            } else {
+                interim += chunk;
+            }
+        }
+        if (finalChunk) pushToTalkFinalText += finalChunk;
+
+        const messageInput = document.getElementById('message-input');
+        if (messageInput) messageInput.value = (pushToTalkFinalText + ' ' + interim).trim();
+
+        clearTimeout(pushToTalkSilenceTimer);
+        pushToTalkSilenceTimer = setTimeout(function () {
+            stopPushToTalk(true);
+        }, PUSH_TO_TALK_SILENCE_MS);
+    };
+
+    pushToTalkRecognition.onerror = function (event) {
+        if (event.error === 'no-speech' || event.error === 'aborted') return;
+        stopPushToTalk(false);
+    };
+
+    pushToTalkRecognition.onend = function () {
+        pushToTalkActive = false;
+        updatePushToTalkUI();
+    };
+
+    try {
+        pushToTalkRecognition.start();
+        pushToTalkActive = true;
+        updatePushToTalkUI();
+        showNotificationToast('🎙 Tinglayapman... gapiring');
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function stopPushToTalk(sendIfHasText) {
+    clearTimeout(pushToTalkSilenceTimer);
+    pushToTalkActive = false;
+    updatePushToTalkUI();
+
+    if (pushToTalkRecognition) {
+        try { pushToTalkRecognition.stop(); } catch (e) { /* ignore */ }
+    }
+
+    if (wasWakeWordActiveBeforePTT && isVoiceAssistantEnabled()) {
+        setTimeout(startVoiceListening, 500);
+    }
+
+    if (sendIfHasText) {
+        const messageInput = document.getElementById('message-input');
+        const text = messageInput ? messageInput.value.trim() : '';
+        if (text) {
+            autoSpeakNextAIReply = true;
+            sendMessage();
+        }
+    }
+}
+
+function updatePushToTalkUI() {
+    const btn = document.getElementById('voice-input-btn');
+    if (!btn) return;
+    btn.classList.toggle('recording', pushToTalkActive);
+}
+
 /* ---------- AI BOGLANISH DARAJASI (Bond) ---------- */
 let currentBondInfo = null;
 
@@ -208,11 +315,12 @@ function switchToPublic() {
 }
 
 function switchToCodeChat() {
+    // "Kod" bolimiga har safar kirganda suhbat toza (bosh) holatda boshlanadi —
+    // avvalgi yozishmalar saqlanmaydi.
     const chats = loadChats();
-    if (!chats[CODE_CHAT_ID]) {
-        chats[CODE_CHAT_ID] = { id: CODE_CHAT_ID, title: '💻 Kod yordamchisi', messages: [] };
-        saveChats(chats);
-    }
+    chats[CODE_CHAT_ID] = { id: CODE_CHAT_ID, title: '💻 Kod yordamchisi', messages: [] };
+    saveChats(chats);
+
     setActiveChatId(CODE_CHAT_ID);
     renderChatList();
     renderMessages();
@@ -414,7 +522,18 @@ function renderMessages() {
         const chat = chats[activeId];
         if (!chat || chat.messages.length === 0) {
             const emptyHtml = (activeId === CODE_CHAT_ID)
-                ? '<div class="empty-state"><h2>💻 Kod yordamchisi</h2><p>Loyihangiz, xatoligingiz yoki yozmoqchi bolgan dasturingiz haqida yozing — men Claude uslubida toliq, ishlaydigan va tushuntirilgan kod yozib beraman.</p></div>'
+                ? '<div class="empty-state code-empty-state">' +
+                      '<div class="code-empty-icon">💻</div>' +
+                      '<h2>Kod yordamchisi</h2>' +
+                      '<p>Loyihangiz, xatoligingiz yoki yozmoqchi bolgan dasturingiz haqida yozing — ' +
+                      'professional, toliq va ishlaydigan kod yozib beraman.</p>' +
+                      '<div class="code-empty-examples">' +
+                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">📝 Vazifalar royxati ilovasi yasab ber</button>' +
+                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">📊 Kompaniyam haqida 5 slaydli prezentatsiya yasab ber</button>' +
+                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">🧮 Python\'da kalkulyator dasturi yoz</button>' +
+                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">🌐 Portfolio sayti yasab ber</button>' +
+                      '</div>' +
+                  '</div>'
                 : '<div class="empty-state"><h2>Nima bilan yordam beray?</h2><p>Bu suhbat faqat sizga korinadi.</p></div>';
             messagesBox.innerHTML = emptyHtml;
             playChatSwitchAnimation();
@@ -747,7 +866,8 @@ function renderAIRichText(container, text) {
         const isHtml = (lang === 'html' || /\.html?$/i.test(fileName));
 
         const previewBtnHtml = isHtml
-            ? '<button type="button" class="code-preview-btn" id="previewbtn_' + blockId + '" onclick="toggleCodePreview(\'' + blockId + '\')">▶️ Korish</button>'
+            ? '<button type="button" class="code-preview-btn" id="previewbtn_' + blockId + '" onclick="toggleCodePreview(\'' + blockId + '\')">▶️ Korish</button>' +
+              '<button type="button" class="code-open-browser-btn" id="openbrowserbtn_' + blockId + '">🌐 Brauzerda ochish</button>'
             : '';
         const previewWrapHtml = isHtml
             ? '<div class="code-preview-wrap" id="preview_' + blockId + '" style="display:none">' +
@@ -803,14 +923,23 @@ function renderAIRichText(container, text) {
     // shu xabardagi boshqa .css/.js fayllar ham avtomatik ichiga qoshib yuboriladi.
     htmlBlocksForPreview.forEach(function (item) {
         const slot = document.getElementById('previewslot_' + item.blockId);
-        if (!slot) return;
         const bundledHtml = buildPreviewHtml(groupFiles, item.code);
-        const iframe = document.createElement('iframe');
-        iframe.className = 'code-preview-frame';
-        iframe.setAttribute('sandbox', 'allow-scripts allow-modals allow-forms allow-popups');
-        iframe.setAttribute('title', 'Kod korinishi');
-        iframe.srcdoc = bundledHtml;
-        slot.appendChild(iframe);
+
+        if (slot) {
+            const iframe = document.createElement('iframe');
+            iframe.className = 'code-preview-frame';
+            iframe.setAttribute('sandbox', 'allow-scripts allow-modals allow-forms allow-popups');
+            iframe.setAttribute('title', 'Kod korinishi');
+            iframe.srcdoc = bundledHtml;
+            slot.appendChild(iframe);
+        }
+
+        const openBtn = document.getElementById('openbrowserbtn_' + item.blockId);
+        if (openBtn) {
+            openBtn.addEventListener('click', function () {
+                openHtmlInNewTab(bundledHtml);
+            });
+        }
     });
 
     if (groupFiles.length >= 1) {
@@ -881,6 +1010,26 @@ function buildPreviewHtml(groupFiles, htmlCode) {
     });
 
     return html;
+}
+
+function useCodeExamplePrompt(btn) {
+    const text = btn.textContent.replace(/^[^\wА-Яа-я]+/, '').trim();
+    messageInput.value = text;
+    messageInput.focus();
+}
+
+function openHtmlInNewTab(html) {
+    try {
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const win = window.open(url, '_blank');
+        if (!win) {
+            showNotificationToast('Brauzer yangi oynani blokladi — popup blocker\'ni ochib qoying');
+        }
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+    } catch (e) {
+        showNotificationToast('Brauzerda ochishda xatolik yuz berdi');
+    }
 }
 
 function toggleCodePreview(blockId) {
@@ -1154,6 +1303,7 @@ socket.on('ai_stream_chunk', function (data) {
 
 socket.on('ai_stream_done', function (data) {
     const finalData = { username: 'Notfic', message: data.message, isAI: true, prompt: data.prompt };
+    let insertedWrap = null;
 
     if (activeStreamRow && data.streamId === activeStreamId) {
         const wrap = activeStreamRow.querySelector('.message-bubble-wrap');
@@ -1164,6 +1314,7 @@ socket.on('ai_stream_done', function (data) {
         }
         if (wrap) {
             wrap.insertAdjacentHTML('beforeend', buildFeedbackHtml(finalData));
+            insertedWrap = wrap;
         }
     } else {
         clearEmptyState();
@@ -1175,6 +1326,16 @@ socket.on('ai_stream_done', function (data) {
     activeStreamRow = null;
     activeStreamTextEl = null;
     activeStreamBuffer = '';
+
+    // Xabar ovoz orqali yuborilgan bolsa, javob ham avtomatik ovozda oqiladi —
+    // haqiqiy "ovozli suhbat" tajribasi uchun.
+    if (autoSpeakNextAIReply) {
+        autoSpeakNextAIReply = false;
+        const ttsBtn = insertedWrap ? insertedWrap.querySelector('.tts-btn') : null;
+        if (ttsBtn) {
+            setTimeout(function () { playAIMessage(data.message, ttsBtn); }, 150);
+        }
+    }
 
     const chats = loadChats();
     let activeId = getActiveChatId();
