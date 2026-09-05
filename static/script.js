@@ -850,7 +850,8 @@ function renderAIRichText(container, text) {
             panel.appendChild(zipBtn);
         }
 
-        container.insertBefore(panel, container.firstChild);
+        panel.classList.add('file-cards-panel-end');
+        container.appendChild(panel);
     }
 }
 

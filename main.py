@@ -27,7 +27,15 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 SECRET_KEY = os.getenv("SECRET_KEY", "notfic_secret_key_123")
 AI_MODEL = os.getenv("AI_MODEL", "openai/gpt-oss-20b")
-GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
+# Groq vizual (vision) modellarni tez-tez eskirtiradi (masalan llama-4-scout 2026-yil
+# iyun oyida eskirtirildi). Asosiy model ishlamasa, shu royxatdagi keyingisiga otamiz.
+GROQ_VISION_FALLBACK_MODELS = [
+    m.strip() for m in os.getenv(
+        "GROQ_VISION_FALLBACK_MODELS",
+        "meta-llama/llama-4-maverick-17b-128e-instruct,meta-llama/llama-4-scout-17b-16e-instruct"
+    ).split(",") if m.strip()
+]
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "notfic_admin_2026")
 ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or "").strip().lower()
 AI_NAME = "Notfic"
@@ -88,34 +96,61 @@ SYSTEM_PROMPT = (
     "Notfic platformasini Salohiddin Botirov yaratganini ayt."
 )
 
-# "Kod" bolimi uchun maxsus rejim — Claude/Claude Code uslubida professional dasturchi ohangi.
+# "Kod" bolimi uchun maxsus rejim — Claude/Claude Code darajasidagi professional dasturchi ohangi.
 # Foydalanuvchi kodlarni fayl korinishida yuklab olishi mumkin bolgani uchun,
 # AI har bir faylni aniq nom bilan belgilashi shart.
 CODE_MODE_SYSTEM_NOTE = (
-    "HOZIR SEN 'KOD' BOLIMIDASAN. Bu yerda foydalanuvchiga professional dasturchi — "
-    "Claude yoki Claude Code kabi — sifatida yordam berasan. Qoidalar: "
-    "1) Doim toliq, ishlaydigan, xatosiz kod yoz — qisqartirilgan yoki 'bu yerga qoshing' "
-    "kabi tolgazish kerak bolgan joylar qoldirma. "
-    "2) Har bir kod faylini alohida fenced-block korinishida ber va TIL:FAYLNOMI formatidan "
+    "HOZIR SEN 'KOD' BOLIMIDASAN. Bu yerda sen — Anthropic'ning Claude/Claude Code darajasidagi "
+    "SENIOR PROGRAMMER'san. Foydalanuvchi sendan hech qanday havaskor emas, balki "
+    "PROFESSIONAL, PRODUCTION-READY daraja kutadi. Quyidagi qoidalarga QATIY amal qil:\n\n"
+
+    "KOD SIFATI:\n"
+    "1) Har doim TOLIQ, ISHLAYDIGAN va XATOSIZ kod yoz. 'bu yerga oz kodingizni qoshing', "
+    "'// TODO', '...' kabi tolgazish kerak bolgan joy QOLDIRMA — hammasini oxirigacha yoz.\n"
+    "2) Yaxshi arxitektura tanla: funksiyalarga/klasslarga togri bolib chiq, "
+    "bitta funksiya bir ishni qilsin (Single Responsibility), keraksiz murakkablikdan qoch.\n"
+    "3) Xatoliklarni boshqarish (error handling) qosh: foydalanuvchi kiritgan notogri "
+    "malumot, tarmoq xatosi, fayl topilmasligi kabi holatlarni albatta korib chiq (try/except, "
+    "validatsiya, aniq xato xabarlari).\n"
+    "4) Xavfsizlik: foydalanuvchi kiritgan malumotni hech qachon ishonib tekshirmasdan "
+    "ishlatma (SQL injection, XSS va h.k.dan saqlan), parollarni ochiq matnda saqlama.\n"
+    "5) Kod ichida MUHIM joylarga qisqa, foydali izoh (comment) yoz — lekin ortiqcha, "
+    "har qatorga izoh yozib chiqma, faqat mantiq murakkab joylarda tushuntir.\n"
+    "6) Zamonaviy, joriy 'best practice'larga amal qil (masalan Python'da PEP8, "
+    "JavaScript'da const/let, async/await, semantik HTML va h.k.).\n"
+    "7) Ishlash tezligi (performance)ni hisobga ol — keraksiz takrorlanuvchi hisoblashlardan, "
+    "sekin algoritmlardan qoch.\n\n"
+
+    "FAYLLARNI TAQDIM ETISH:\n"
+    "8) Har bir kod faylini alohida fenced-block korinishida ber va TIL:FAYLNOMI formatidan "
     "foydalan, masalan ```python:main.py``` yoki ```html:index.html``` — bu foydalanuvchiga "
-    "kodni tobga alohida fayl sifatida yuklab olish imkonini beradi. "
-    "3) Bir nechta fayldan iborat loyihada, har bir faylni shu formatda alohida-alohida ber. "
-    "4) Kod tagida qisqa, sodda tilda nima qilinganini va qanday ishga tushirishni tushuntir. "
-    "5) Agar foydalanuvchi 'ilova', 'dastur' yoki 'sayt' desa va aniq platforma "
-    "koâ€˜rsatmasa, iloji boricha oddiy HTML+CSS+JS (bitta index.html fayl) korinishida yoz — "
-    "bunday kod hech qanday kompilyatsiyasiz, xuddi shu faylni ochish orqali ham "
-    "kompyuterda (brauzerda), ham Android telefonda (brauzerda yoki 'Bosh ekranga qoshish' "
-    "orqali ilova kabi) bab-baravar ishlaydi. "
-    "6) Agar foydalanuvchi aniq native dastur (.exe yoki .apk) sorasa: kodni toliq yoz, "
-    "lekin ANIQ va HALOL tarzda ayt-ki, sen ozing .exe yoki .apk faylni "
-    "generatsiya qila olmaysan — buning uchun kodni PyInstaller (desktop/.exe uchun) yoki "
-    "Android Studio/Buildozer (.apk uchun) yordamida qurish (build) kerakligini qisqa tushuntir. "
-    "7) Kodni hech qachon ozing his qilmagan holda 'ishlaydi' deb yolgon vada berma — "
-    "faqat sinab korilgan, togri mantiqli kod yoz. "
-    "8) HTML fayllar suhbatda avtomatik jonli korinish (live preview) bilan korsatiladi. "
+    "kodni alohida fayl sifatida yuklab olish imkonini beradi.\n"
+    "9) Bir nechta fayldan iborat loyihada, har bir faylni shu formatda alohida-alohida ber, "
+    "va loyiha strukturasini (qaysi fayl nima uchun kerakligini) qisqacha tushuntir.\n"
+    "10) Kod tagida sodda tilda: nima qilinganini, qanday ishga tushirishni (masalan "
+    "'pip install ...', 'python main.py') va agar bolsa qanday sinab korish mumkinligini yoz.\n\n"
+
+    "PLATFORMA STRATEGIYASI:\n"
+    "11) Agar foydalanuvchi 'ilova', 'dastur' yoki 'sayt' desa va aniq platforma korsatmasa, "
+    "iloji boricha oddiy HTML+CSS+JS (bitta index.html fayl yoki bir nechta bogliq fayl) "
+    "korinishida yoz — bunday kod hech qanday kompilyatsiyasiz, xuddi shu faylni ochish orqali "
+    "ham kompyuterda (brauzerda), ham Android telefonda (brauzerda yoki 'Bosh ekranga qoshish' "
+    "orqali ilova kabi) bab-baravar ishlaydi. Responsive (mobil ekranga ham mos) dizayn yoz.\n"
+    "12) Agar foydalanuvchi aniq native dastur (.exe yoki .apk) sorasa: kodni toliq va "
+    "professional darajada yoz, lekin ANIQ va HALOL tarzda ayt-ki, sen ozing .exe yoki .apk "
+    "faylni generatsiya qila olmaysan — buning uchun kodni PyInstaller (desktop/.exe uchun) "
+    "yoki Android Studio/Buildozer (.apk uchun) yordamida qurish (build) kerakligini "
+    "qisqa tushuntir.\n"
+    "13) HTML fayllar suhbatda avtomatik jonli korinish (live preview) bilan korsatiladi. "
     "Agar CSS yoki JS'ni alohida faylga chiqarsang, ularni HTML ichida oddiy nisbiy nom bilan "
-    "bogla, masalan <link rel=\"stylesheet\" href=\"style.css\"> va <script src=\"script.js\">— "
-    "fayl nomlari bir-biriga mos kelishi shart, shunda ular avtomatik birlashtirilib korsatiladi."
+    "bogla, masalan <link rel=\"stylesheet\" href=\"style.css\"> va <script src=\"script.js\"> — "
+    "fayl nomlari bir-biriga mos kelishi shart, shunda ular avtomatik birlashtirilib korsatiladi.\n\n"
+
+    "HALOLLIK:\n"
+    "14) Kodni hech qachon ozing sinab kormagan holda 'ishlaydi' deb yolgon vada berma — "
+    "faqat togri mantiqqa asoslangan, diqqat bilan tekshirilgan kod yoz. Agar biror joyda "
+    "shubhang bolsa yoki qoshimcha malumot (masalan API kaliti, versiya) kerak bolsa, "
+    "buni ochiq ayt, lekin baribir eng yaxshi taxminiy yechimni toliq yozib ber."
 )
 
 
@@ -456,20 +491,28 @@ def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None
 
     messages, model_to_use = _build_ai_messages(prompt, context, user, extra_system_note, image_data_uri)
 
-    try:
-        completion = ai_client.chat.completions.create(
-            model=model_to_use,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=1024
-        )
-        return completion.choices[0].message.content
+    candidate_models = [model_to_use]
+    if image_data_uri:
+        candidate_models += [m for m in GROQ_VISION_FALLBACK_MODELS if m != model_to_use]
 
-    except Exception as e:
-        logger.error(f"Groq AI xatosi: {e}")
-        if image_data_uri:
-            return f"{AI_NAME}: Rasmni tahlil qila olmadim, birozdan song qayta urinib koring."
-        return f"{AI_NAME}: Hozir javob bera olmadim, birozdan song qayta urinib koring."
+    last_error = None
+    for candidate in candidate_models:
+        try:
+            completion = ai_client.chat.completions.create(
+                model=candidate,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=1024
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            last_error = e
+            logger.warning(f"AI model '{candidate}' ishlamadi, keyingisi sinaladi: {e}")
+
+    logger.error(f"Groq AI xatosi (barcha modellar sinaldi): {last_error}")
+    if image_data_uri:
+        return f"{AI_NAME}: Rasmni tahlil qila olmadim, birozdan song qayta urinib koring."
+    return f"{AI_NAME}: Hozir javob bera olmadim, birozdan song qayta urinib koring."
 
 
 def _build_ai_messages(prompt, context, user, extra_system_note, image_data_uri):
@@ -515,7 +558,7 @@ def _build_ai_messages(prompt, context, user, extra_system_note, image_data_uri)
 
 
 def stream_ai_response(prompt: str, context=None, user=None, extra_system_note=None,
-                        image_data_uri=None, on_chunk=None, max_tokens=1024) -> str:
+                        image_data_uri=None, on_chunk=None, max_tokens=1024, reasoning_effort=None) -> str:
     """AI javobini boâ€˜lak-boâ€˜lak (stream) generatsiya qiladi, har bir boâ€˜lakni on_chunk'ga yuboradi.
     ChatGPT/Gemini'dagidek 'jonli yozilayotgan' effekt uchun."""
     if not ai_client:
@@ -535,41 +578,61 @@ def stream_ai_response(prompt: str, context=None, user=None, extra_system_note=N
 
     messages, model_to_use = _build_ai_messages(prompt, context, user, extra_system_note, image_data_uri)
 
+    extra_kwargs = {}
+    if reasoning_effort and not image_data_uri and "gpt-oss" in model_to_use.lower():
+        extra_kwargs["reasoning_effort"] = reasoning_effort
+
+    # Rasm bor bolsa, asosiy vizual model ishlamay qolgan holatlar uchun (masalan Groq
+    # modelni eskirtirib qoysa) zaxira modellarni ham sinab koramiz.
+    candidate_models = [model_to_use]
+    if image_data_uri:
+        candidate_models += [m for m in GROQ_VISION_FALLBACK_MODELS if m != model_to_use]
+
     full_text = ""
-    try:
-        stream = ai_client.chat.completions.create(
-            model=model_to_use,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=max_tokens,
-            stream=True
-        )
-        for chunk in stream:
-            delta = ""
-            try:
-                delta = chunk.choices[0].delta.content or ""
-            except Exception:
+    started_streaming = False
+    last_error = None
+
+    for candidate in candidate_models:
+        try:
+            stream = ai_client.chat.completions.create(
+                model=candidate,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=max_tokens,
+                stream=True,
+                **extra_kwargs
+            )
+            for chunk in stream:
                 delta = ""
-            if delta:
-                full_text += delta
-                if on_chunk:
-                    on_chunk(delta)
+                try:
+                    delta = chunk.choices[0].delta.content or ""
+                except Exception:
+                    delta = ""
+                if delta:
+                    started_streaming = True
+                    full_text += delta
+                    if on_chunk:
+                        on_chunk(delta)
 
-        if not full_text.strip():
-            full_text = f"{AI_NAME}: Hozir javob bera olmadim, birozdan song qayta urinib koring."
-            if on_chunk:
-                on_chunk(full_text)
+            if full_text.strip():
+                return full_text
+            if started_streaming:
+                break
+            last_error = "boâ€˜sh javob qaytdi"
 
-        return full_text
+        except Exception as e:
+            last_error = e
+            logger.warning(f"AI model '{candidate}' ishlamadi, keyingisi sinaladi: {e}")
+            if started_streaming:
+                break
 
-    except Exception as e:
-        logger.error(f"Groq AI oqim xatosi: {e}")
-        fallback = (f"{AI_NAME}: Rasmni tahlil qila olmadim, birozdan song qayta urinib koring."
-                    if image_data_uri else
-                    f"{AI_NAME}: Hozir javob bera olmadim, birozdan song qayta urinib koring.")
-        if on_chunk:
-            on_chunk(fallback)
-        return fallback
+    logger.error(f"Groq AI oqim xatosi (barcha modellar sinaldi): {last_error}")
+    fallback = (f"{AI_NAME}: Rasmni tahlil qila olmadim, birozdan song qayta urinib koring."
+                if image_data_uri else
+                f"{AI_NAME}: Hozir javob bera olmadim, birozdan song qayta urinib koring.")
+    if on_chunk:
+        on_chunk(fallback)
+    return fallback
 
 
 def current_user():
@@ -1845,7 +1908,8 @@ def handle_ai_message(data):
     ai_reply = stream_ai_response(
         msg, context, user=user, image_data_uri=image_data_uri, on_chunk=on_chunk,
         extra_system_note=(CODE_MODE_SYSTEM_NOTE if is_code_mode else None),
-        max_tokens=(3500 if is_code_mode else 1024)
+        max_tokens=(8192 if is_code_mode else 1024),
+        reasoning_effort=('high' if is_code_mode else None)
     )
     emit('ai_stream_done', {'streamId': stream_id, 'message': ai_reply, 'prompt': msg})
 

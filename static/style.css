@@ -17,6 +17,8 @@ html[data-theme="light"] {
     --shadow-lg: 0 24px 60px rgba(21,22,43,0.16);
     --glow-ring: 0 0 0 3px rgba(109,79,255,0.14);
     --font-display: 'Space Grotesk', 'Inter', sans-serif;
+    --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-snappy: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 html[data-theme="dark"] {
@@ -54,6 +56,21 @@ html[data-accent="emerald"] {
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body, .sidebar, .main, .panel, .modal, .chat-item, button, input, textarea {
+    transition: background-color 0.25s var(--ease-smooth), border-color 0.25s var(--ease-smooth), color 0.25s var(--ease-smooth);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
 
 html, body {
     height: 100%;
@@ -118,11 +135,11 @@ html, body {
     background: var(--panel); color: var(--ink);
     font-family: inherit; font-size: 13.5px; font-weight: 500;
     cursor: pointer; margin-bottom: 18px;
-    transition: background 0.15s, border-color 0.15s;
+    transition: background 0.2s var(--ease-smooth), border-color 0.2s var(--ease-smooth), transform 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth);
     position: relative;
 }
 
-.new-chat-btn:hover { background: var(--hover); border-color: var(--accent); }
+.new-chat-btn:hover { background: var(--hover); border-color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 .new-chat-btn:active { transform: scale(0.98); }
 
 .sidebar-badge {
@@ -207,7 +224,7 @@ html, body {
     padding: 9px 10px; border-radius: 8px;
     color: var(--ink); text-decoration: none; font-size: 13.5px;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.2s var(--ease-smooth), transform 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth);
 }
 
 .chat-item-title {
@@ -301,7 +318,7 @@ html, body {
 
 .support-shield-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
-.sidebar-link:hover, .chat-item:hover { background: var(--hover); }
+.sidebar-link:hover, .chat-item:hover { background: var(--hover); transform: translateX(2px); }
 .chat-item.active { background: var(--panel); font-weight: 500; box-shadow: var(--shadow-sm), var(--glow-ring); }
 
 .chat-item.pinned {
@@ -696,6 +713,13 @@ html, body {
     flex-direction: column;
     gap: 8px;
     margin-bottom: 10px;
+}
+
+.file-cards-panel-end {
+    margin-top: 12px;
+    margin-bottom: 0;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(255,255,255,0.08);
 }
 
 .file-card {
@@ -1326,12 +1350,12 @@ html, body {
 .send-btn {
     width: 36px; height: 36px; flex-shrink: 0; border: none; border-radius: 50%;
     background: var(--bubble-gradient); color: #fff; display: flex; align-items: center;
-    justify-content: center; cursor: pointer; transition: box-shadow 0.2s, transform 0.1s;
+    justify-content: center; cursor: pointer; transition: box-shadow 0.25s var(--ease-smooth), transform 0.15s var(--ease-snappy);
     box-shadow: var(--shadow-sm);
 }
 
-.send-btn:hover { box-shadow: var(--shadow-md); }
-.send-btn:active { transform: scale(0.92); }
+.send-btn:hover { box-shadow: var(--shadow-md); transform: translateY(-1px) scale(1.04); }
+.send-btn:active { transform: scale(0.9); }
 
 .modal-overlay {
     position: fixed; inset: 0; background: rgba(20,19,18,0.45);
@@ -1340,7 +1364,7 @@ html, body {
     backdrop-filter: blur(2px);
 }
 
-.modal-overlay.open { display: flex; animation: fade-in 0.15s ease; }
+.modal-overlay.open { display: flex; animation: fade-in 0.22s var(--ease-smooth); }
 
 @keyframes fade-in {
     from { opacity: 0; }
@@ -1353,11 +1377,11 @@ html, body {
     box-shadow: var(--shadow-lg);
     max-height: 85vh;
     overflow-y: auto;
-    animation: modal-pop 0.18s ease;
+    animation: modal-pop 0.32s var(--ease-smooth);
 }
 
 @keyframes modal-pop {
-    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    from { opacity: 0; transform: translateY(16px) scale(0.96); }
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
