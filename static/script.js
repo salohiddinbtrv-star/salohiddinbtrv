@@ -528,6 +528,7 @@ function renderMessages() {
                       '<p>Loyihangiz, xatoligingiz yoki yozmoqchi bolgan dasturingiz haqida yozing — ' +
                       'professional, toliq va ishlaydigan kod yozib beraman.</p>' +
                       '<div class="code-empty-examples">' +
+                          '<button type="button" class="code-example-chip code-example-chip-special" onclick="useScreenshotToCodePrompt()">📸 Skrinshotdan sayt yasash</button>' +
                           '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">📝 Vazifalar royxati ilovasi yasab ber</button>' +
                           '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">📊 Kompaniyam haqida 5 slaydli prezentatsiya yasab ber</button>' +
                           '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">🧮 Python\'da kalkulyator dasturi yoz</button>' +
@@ -736,6 +737,7 @@ function appendMessageToDOM(data, animate) {
     }
 
     messagesBox.appendChild(row);
+    return row;
 }
 
 /* ---------- CLAUDE'GA OXSHASH KOD BLOKLARI VA MARKDOWN RENDERI ---------- */
@@ -1014,8 +1016,21 @@ function buildPreviewHtml(groupFiles, htmlCode) {
 
 function useCodeExamplePrompt(btn) {
     const text = btn.textContent.replace(/^[^\wА-Яа-я]+/, '').trim();
-    messageInput.value = text;
-    messageInput.focus();
+    const input = document.getElementById('message-input');
+    if (input) {
+        input.value = text;
+        input.focus();
+    }
+}
+
+function useScreenshotToCodePrompt() {
+    const input = document.getElementById('message-input');
+    if (input) {
+        input.value = 'Bu skrinshotdagi dizaynni HTML+CSS kodga aylantirib ber';
+        input.focus();
+    }
+    const fileInput = document.getElementById('chat-image-input');
+    if (fileInput) fileInput.click();
 }
 
 function openHtmlInNewTab(html) {

@@ -158,8 +158,17 @@ CODE_MODE_SYSTEM_NOTE = (
     "animatsiyasi bilan yoz — bu fayl darhol jonli korinish (preview)da ishlab, "
     "brauzerda toliq ekranli taqdimot sifatida korsatiladi.\n\n"
 
+    "SKRINSHOT/DIZAYNNI KODGA AYLANTIRISH:\n"
+    "15) Agar foydalanuvchi rasm (skrinshot, sayt dizayni, mokap) yuborib, undan sayt yoki "
+    "interfeys yasab berishni sorasa: rasmni diqqat bilan tahlil qil — ranglar palitrasi, "
+    "joylashuv (layout, gridlar, boshliqlar), shrift uslubi va olchamlari, tugmalar, "
+    "ikonkalar, matnlar va umumiy kompozitsiyani iloji boricha aniq qayta yarat. "
+    "Pikselga aniq bolishi shart emas, lekin rang sxemasi, struktura va 'kayfiyat' mos "
+    "kelishi kerak. Natijani albatta toliq ishlaydigan HTML+CSS (kerak bolsa JS) korinishida, "
+    "TIL:FAYLNOMI formatida ber, va nimalarni qanday talqin qilganingni qisqa tushuntir.\n\n"
+
     "HALOLLIK:\n"
-    "15) Kodni hech qachon ozing sinab kormagan holda 'ishlaydi' deb yolgon vada berma — "
+    "16) Kodni hech qachon ozing sinab kormagan holda 'ishlaydi' deb yolgon vada berma — "
     "faqat togri mantiqqa asoslangan, diqqat bilan tekshirilgan kod yoz. Agar biror joyda "
     "shubhang bolsa yoki qoshimcha malumot (masalan API kaliti, versiya) kerak bolsa, "
     "buni ochiq ayt, lekin baribir eng yaxshi taxminiy yechimni toliq yozib ber."
@@ -570,7 +579,8 @@ def _build_ai_messages(prompt, context, user, extra_system_note, image_data_uri)
 
 
 def stream_ai_response(prompt: str, context=None, user=None, extra_system_note=None,
-                        image_data_uri=None, on_chunk=None, max_tokens=1024, reasoning_effort=None) -> str:
+                        image_data_uri=None, on_chunk=None, max_tokens=1024, reasoning_effort=None,
+                        temperature=0.7) -> str:
     """AI javobini boâ€˜lak-boâ€˜lak (stream) generatsiya qiladi, har bir boâ€˜lakni on_chunk'ga yuboradi.
     ChatGPT/Gemini'dagidek 'jonli yozilayotgan' effekt uchun."""
     if not ai_client:
@@ -609,7 +619,7 @@ def stream_ai_response(prompt: str, context=None, user=None, extra_system_note=N
             stream = ai_client.chat.completions.create(
                 model=candidate,
                 messages=messages,
-                temperature=0.7,
+                temperature=temperature,
                 max_tokens=max_tokens,
                 stream=True,
                 **extra_kwargs
