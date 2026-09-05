@@ -111,7 +111,11 @@ CODE_MODE_SYSTEM_NOTE = (
     "generatsiya qila olmaysan — buning uchun kodni PyInstaller (desktop/.exe uchun) yoki "
     "Android Studio/Buildozer (.apk uchun) yordamida qurish (build) kerakligini qisqa tushuntir. "
     "7) Kodni hech qachon ozing his qilmagan holda 'ishlaydi' deb yolgon vada berma — "
-    "faqat sinab korilgan, togri mantiqli kod yoz."
+    "faqat sinab korilgan, togri mantiqli kod yoz. "
+    "8) HTML fayllar suhbatda avtomatik jonli korinish (live preview) bilan korsatiladi. "
+    "Agar CSS yoki JS'ni alohida faylga chiqarsang, ularni HTML ichida oddiy nisbiy nom bilan "
+    "bogla, masalan <link rel=\"stylesheet\" href=\"style.css\"> va <script src=\"script.js\">— "
+    "fayl nomlari bir-biriga mos kelishi shart, shunda ular avtomatik birlashtirilib korsatiladi."
 )
 
 

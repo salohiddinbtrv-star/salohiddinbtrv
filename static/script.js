@@ -645,6 +645,32 @@ function inferFileName(lang, filename, index) {
     return 'kod_' + (index + 1) + '.' + ext;
 }
 
+function fileExtOf(filename) {
+    const parts = filename.split('.');
+    return parts.length > 1 ? parts.pop().toLowerCase() : '';
+}
+
+function fileDisplayName(filename) {
+    const base = filename.replace(/\.[^/.]+$/, '');
+    const words = base.replace(/[-_]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return filename;
+    return words.map(function (w) {
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join(' ');
+}
+
+function fileTypeLabel(ext) {
+    if (!ext) return 'Fayl';
+    if (ext === 'html' || ext === 'css') return 'Code · ' + ext.toUpperCase();
+    return ext.toUpperCase();
+}
+
+function fileIconClass(ext) {
+    if (ext === 'html') return 'file-icon-html';
+    if (ext === 'css') return 'file-icon-css';
+    return 'file-icon-default';
+}
+
 function downloadTextFile(filename, content) {
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -696,6 +722,7 @@ function renderAIRichText(container, text) {
 
     const groupId = 'grp_' + Date.now() + '_' + (codeBlockCounter++);
     const groupFiles = [];
+    const htmlBlocksForPreview = [];
 
     while ((match = fenceRegex.exec(text)) !== null) {
         foundBlock = true;
@@ -717,6 +744,18 @@ function renderAIRichText(container, text) {
         groupFiles.push({ filename: fileName, code: code });
 
         const blockId = 'codeblk_' + Date.now() + '_' + codeBlockCounter++;
+        const isHtml = (lang === 'html' || /\.html?$/i.test(fileName));
+
+        const previewBtnHtml = isHtml
+            ? '<button type="button" class="code-preview-btn" id="previewbtn_' + blockId + '" onclick="toggleCodePreview(\'' + blockId + '\')">▶️ Korish</button>'
+            : '';
+        const previewWrapHtml = isHtml
+            ? '<div class="code-preview-wrap" id="preview_' + blockId + '" style="display:none">' +
+                  '<div class="code-preview-toolbar"><span>🖥️ Onlayn korinish</span>' +
+                  '<button type="button" class="code-preview-close" onclick="toggleCodePreview(\'' + blockId + '\')">✕ Yopish</button></div>' +
+                  '<div class="code-preview-slot" id="previewslot_' + blockId + '"></div>' +
+              '</div>'
+            : '';
 
         const block = document.createElement('div');
         block.className = 'code-block';
@@ -724,17 +763,23 @@ function renderAIRichText(container, text) {
             '<div class="code-block-header">' +
                 '<span class="code-lang">' + escapeHtml(fileName) + '</span>' +
                 '<div class="code-block-actions">' +
+                    previewBtnHtml +
                     '<button type="button" class="code-copy-btn" onclick="copyCodeBlock(\'' + blockId + '\', this)">📋 Nusxa</button>' +
                     '<button type="button" class="code-download-btn" onclick="downloadTextFile(' + JSON.stringify(fileName) + ', document.getElementById(\'' + blockId + '\').textContent)">⬇️ Fayl</button>' +
                 '</div>' +
             '</div>' +
-            '<pre><code id="' + blockId + '" class="hljs' + (lang ? ' language-' + lang : '') + '"></code></pre>';
+            '<pre><code id="' + blockId + '" class="hljs' + (lang ? ' language-' + lang : '') + '"></code></pre>' +
+            previewWrapHtml;
         container.appendChild(block);
 
         const codeEl = block.querySelector('code');
         codeEl.textContent = code;
         if (window.hljs) {
             try { window.hljs.highlightElement(codeEl); } catch (e) { /* highlight ishlamasa ham kod korinib turadi */ }
+        }
+
+        if (isHtml) {
+            htmlBlocksForPreview.push({ blockId: blockId, code: code });
         }
 
         lastIndex = fenceRegex.lastIndex;
@@ -754,14 +799,98 @@ function renderAIRichText(container, text) {
         container.innerHTML = formatInlineMarkdown(text);
     }
 
-    if (groupFiles.length >= 2) {
-        notficCodeFileGroups[groupId] = groupFiles;
-        const zipBar = document.createElement('div');
-        zipBar.className = 'code-zip-bar';
-        zipBar.innerHTML =
-            '<span>📦 ' + groupFiles.length + ' ta fayldan iborat loyiha</span>' +
-            '<button type="button" class="code-zip-btn" onclick="downloadCodeGroupAsZip(\'' + groupId + '\', this)">Hammasini ZIP qilib yuklab olish</button>';
-        container.insertBefore(zipBar, container.firstChild);
+    // HTML bloklari uchun jonli korinish (preview) iframe'ini tayyorlab qoyamiz —
+    // shu xabardagi boshqa .css/.js fayllar ham avtomatik ichiga qoshib yuboriladi.
+    htmlBlocksForPreview.forEach(function (item) {
+        const slot = document.getElementById('previewslot_' + item.blockId);
+        if (!slot) return;
+        const bundledHtml = buildPreviewHtml(groupFiles, item.code);
+        const iframe = document.createElement('iframe');
+        iframe.className = 'code-preview-frame';
+        iframe.setAttribute('sandbox', 'allow-scripts allow-modals allow-forms allow-popups');
+        iframe.setAttribute('title', 'Kod korinishi');
+        iframe.srcdoc = bundledHtml;
+        slot.appendChild(iframe);
+    });
+
+    if (groupFiles.length >= 1) {
+        const panel = document.createElement('div');
+        panel.className = 'file-cards-panel';
+
+        groupFiles.forEach(function (f) {
+            const ext = fileExtOf(f.filename);
+            const card = document.createElement('div');
+            card.className = 'file-card';
+            card.innerHTML =
+                '<div class="file-card-icon ' + fileIconClass(ext) + '">' +
+                    (ext === 'html' ? '🌐' : '<span class="file-card-icon-glyph">&lt;/&gt;</span>') +
+                '</div>' +
+                '<div class="file-card-info">' +
+                    '<div class="file-card-name">' + escapeHtml(fileDisplayName(f.filename)) + '</div>' +
+                    '<div class="file-card-sub">' + escapeHtml(fileTypeLabel(ext)) + '</div>' +
+                '</div>' +
+                '<button type="button" class="file-card-download">Download</button>';
+
+            card.querySelector('.file-card-download').addEventListener('click', function () {
+                downloadTextFile(f.filename, f.code);
+            });
+
+            panel.appendChild(card);
+        });
+
+        if (groupFiles.length >= 2) {
+            notficCodeFileGroups[groupId] = groupFiles;
+            const zipBtn = document.createElement('button');
+            zipBtn.type = 'button';
+            zipBtn.className = 'file-cards-zip-btn';
+            zipBtn.textContent = '📦 Barcha ' + groupFiles.length + ' faylni ZIP qilib yuklab olish';
+            zipBtn.addEventListener('click', function () {
+                downloadCodeGroupAsZip(groupId, zipBtn);
+            });
+            panel.appendChild(zipBtn);
+        }
+
+        container.insertBefore(panel, container.firstChild);
+    }
+}
+
+function buildPreviewHtml(groupFiles, htmlCode) {
+    let html = htmlCode;
+
+    function findFile(name) {
+        return groupFiles.find(function (f) {
+            return f.filename === name || f.filename.endsWith('/' + name);
+        });
+    }
+
+    // <link rel="stylesheet" href="..."> (ikkala tartibda ham)
+    html = html.replace(/<link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref=["']([^"']+)["'][^>]*>/gi, function (m, href) {
+        const file = findFile(href);
+        return file ? ('<style>\n' + file.code + '\n</style>') : m;
+    });
+    html = html.replace(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\brel=["']stylesheet["'][^>]*>/gi, function (m, href) {
+        const file = findFile(href);
+        return file ? ('<style>\n' + file.code + '\n</style>') : m;
+    });
+
+    // <script src="..."></script>
+    html = html.replace(/<script\b([^>]*)\bsrc=["']([^"']+)["']([^>]*)>\s*<\/script>/gi, function (m, before, src, after) {
+        const file = findFile(src);
+        return file ? ('<script>\n' + file.code + '\n</script>') : m;
+    });
+
+    return html;
+}
+
+function toggleCodePreview(blockId) {
+    const wrap = document.getElementById('preview_' + blockId);
+    const btn = document.getElementById('previewbtn_' + blockId);
+    if (!wrap) return;
+    const isOpen = wrap.style.display !== 'none';
+    wrap.style.display = isOpen ? 'none' : 'block';
+    if (btn) btn.textContent = isOpen ? '▶️ Korish' : '⏸ Yopish';
+    if (!isOpen) {
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 
