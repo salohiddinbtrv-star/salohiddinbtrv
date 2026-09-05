@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="/static/style.css?v={{ v }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
 </head>
 <body data-logged-in="{{ 'true' if user else 'false' }}" data-anon-limit="{{ anon_limit }}" data-streak="{{ user.streak_count if user and user.streak_count else 0 }}" data-tts-enabled="{{ 'true' if tts_enabled else 'false' }}">
 

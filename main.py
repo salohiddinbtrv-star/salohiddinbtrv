@@ -88,6 +88,32 @@ SYSTEM_PROMPT = (
     "Notfic platformasini Salohiddin Botirov yaratganini ayt."
 )
 
+# "Kod" bolimi uchun maxsus rejim — Claude/Claude Code uslubida professional dasturchi ohangi.
+# Foydalanuvchi kodlarni fayl korinishida yuklab olishi mumkin bolgani uchun,
+# AI har bir faylni aniq nom bilan belgilashi shart.
+CODE_MODE_SYSTEM_NOTE = (
+    "HOZIR SEN 'KOD' BOLIMIDASAN. Bu yerda foydalanuvchiga professional dasturchi — "
+    "Claude yoki Claude Code kabi — sifatida yordam berasan. Qoidalar: "
+    "1) Doim toliq, ishlaydigan, xatosiz kod yoz — qisqartirilgan yoki 'bu yerga qoshing' "
+    "kabi tolgazish kerak bolgan joylar qoldirma. "
+    "2) Har bir kod faylini alohida fenced-block korinishida ber va TIL:FAYLNOMI formatidan "
+    "foydalan, masalan ```python:main.py``` yoki ```html:index.html``` — bu foydalanuvchiga "
+    "kodni tobga alohida fayl sifatida yuklab olish imkonini beradi. "
+    "3) Bir nechta fayldan iborat loyihada, har bir faylni shu formatda alohida-alohida ber. "
+    "4) Kod tagida qisqa, sodda tilda nima qilinganini va qanday ishga tushirishni tushuntir. "
+    "5) Agar foydalanuvchi 'ilova', 'dastur' yoki 'sayt' desa va aniq platforma "
+    "koâ€˜rsatmasa, iloji boricha oddiy HTML+CSS+JS (bitta index.html fayl) korinishida yoz — "
+    "bunday kod hech qanday kompilyatsiyasiz, xuddi shu faylni ochish orqali ham "
+    "kompyuterda (brauzerda), ham Android telefonda (brauzerda yoki 'Bosh ekranga qoshish' "
+    "orqali ilova kabi) bab-baravar ishlaydi. "
+    "6) Agar foydalanuvchi aniq native dastur (.exe yoki .apk) sorasa: kodni toliq yoz, "
+    "lekin ANIQ va HALOL tarzda ayt-ki, sen ozing .exe yoki .apk faylni "
+    "generatsiya qila olmaysan — buning uchun kodni PyInstaller (desktop/.exe uchun) yoki "
+    "Android Studio/Buildozer (.apk uchun) yordamida qurish (build) kerakligini qisqa tushuntir. "
+    "7) Kodni hech qachon ozing his qilmagan holda 'ishlaydi' deb yolgon vada berma — "
+    "faqat sinab korilgan, togri mantiqli kod yoz."
+)
+
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -485,7 +511,7 @@ def _build_ai_messages(prompt, context, user, extra_system_note, image_data_uri)
 
 
 def stream_ai_response(prompt: str, context=None, user=None, extra_system_note=None,
-                        image_data_uri=None, on_chunk=None) -> str:
+                        image_data_uri=None, on_chunk=None, max_tokens=1024) -> str:
     """AI javobini boâ€˜lak-boâ€˜lak (stream) generatsiya qiladi, har bir boâ€˜lakni on_chunk'ga yuboradi.
     ChatGPT/Gemini'dagidek 'jonli yozilayotgan' effekt uchun."""
     if not ai_client:
@@ -511,7 +537,7 @@ def stream_ai_response(prompt: str, context=None, user=None, extra_system_note=N
             model=model_to_use,
             messages=messages,
             temperature=0.7,
-            max_tokens=1024,
+            max_tokens=max_tokens,
             stream=True
         )
         for chunk in stream:
@@ -1763,6 +1789,7 @@ def handle_ai_message(data):
     client_id = data.get('clientId')
     context = data.get('context') or []
     image_data_uri = data.get('image')
+    is_code_mode = data.get('chatType') == 'code'
 
     if image_data_uri:
         if not isinstance(image_data_uri, str) or not image_data_uri.startswith('data:image/'):
@@ -1811,7 +1838,11 @@ def handle_ai_message(data):
         emit('ai_stream_chunk', {'streamId': stream_id, 'chunk': delta})
         socketio.sleep(0)
 
-    ai_reply = stream_ai_response(msg, context, user=user, image_data_uri=image_data_uri, on_chunk=on_chunk)
+    ai_reply = stream_ai_response(
+        msg, context, user=user, image_data_uri=image_data_uri, on_chunk=on_chunk,
+        extra_system_note=(CODE_MODE_SYSTEM_NOTE if is_code_mode else None),
+        max_tokens=(3500 if is_code_mode else 1024)
+    )
     emit('ai_stream_done', {'streamId': stream_id, 'message': ai_reply, 'prompt': msg})
 
     if user:

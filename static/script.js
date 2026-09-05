@@ -628,13 +628,74 @@ function formatInlineMarkdown(text) {
 }
 
 let codeBlockCounter = 0;
+let notficCodeFileGroups = {};
+
+const FILE_EXT_MAP = {
+    python: 'py', py: 'py', javascript: 'js', js: 'js', typescript: 'ts', ts: 'ts',
+    jsx: 'jsx', tsx: 'tsx', html: 'html', css: 'css', java: 'java', kotlin: 'kt', kt: 'kt',
+    c: 'c', cpp: 'cpp', 'c++': 'cpp', csharp: 'cs', cs: 'cs', php: 'php', ruby: 'rb',
+    go: 'go', rust: 'rs', sql: 'sql', json: 'json', xml: 'xml', yaml: 'yml', yml: 'yml',
+    bash: 'sh', sh: 'sh', shell: 'sh', swift: 'swift', dart: 'dart', gradle: 'gradle',
+    dockerfile: 'Dockerfile', txt: 'txt', markdown: 'md', md: 'md'
+};
+
+function inferFileName(lang, filename, index) {
+    if (filename && filename.trim()) return filename.trim().replace(/[^\w.\-]/g, '_');
+    const ext = FILE_EXT_MAP[lang] || 'txt';
+    return 'kod_' + (index + 1) + '.' + ext;
+}
+
+function downloadTextFile(filename, content) {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+}
+
+async function downloadCodeGroupAsZip(groupId, btn) {
+    const files = notficCodeFileGroups[groupId];
+    if (!files || files.length === 0) return;
+    if (!window.JSZip) {
+        showNotificationToast('ZIP kutubxonasi hali yuklanmoqda, biroz kuting va qayta bosing');
+        return;
+    }
+    const original = btn.textContent;
+    btn.textContent = '⏳ Tayyorlanmoqda...';
+    btn.disabled = true;
+    try {
+        const zip = new window.JSZip();
+        files.forEach(function (f) { zip.file(f.filename, f.code); });
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'notfic_loyiha.zip';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    } catch (e) {
+        showNotificationToast('ZIP yaratishda xatolik yuz berdi');
+    }
+    btn.textContent = original;
+    btn.disabled = false;
+}
 
 function renderAIRichText(container, text) {
     container.innerHTML = '';
-    const fenceRegex = /```(\w*)\n?([\s\S]*?)```/g;
+    const fenceRegex = /```([\w+-]*)(?::([^\n`]+))?\n?([\s\S]*?)```/g;
     let lastIndex = 0;
     let match;
     let foundBlock = false;
+    let blockIndexInMsg = 0;
+
+    const groupId = 'grp_' + Date.now() + '_' + (codeBlockCounter++);
+    const groupFiles = [];
 
     while ((match = fenceRegex.exec(text)) !== null) {
         foundBlock = true;
@@ -649,15 +710,23 @@ function renderAIRichText(container, text) {
         }
 
         const lang = (match[1] || '').toLowerCase();
-        const code = match[2].replace(/\n$/, '');
-        const blockId = 'codeblk_' + Date.now() + '_' + (codeBlockCounter++);
+        const explicitName = match[2] || '';
+        const code = match[3].replace(/\n$/, '');
+        const fileName = inferFileName(lang, explicitName, blockIndexInMsg);
+        blockIndexInMsg++;
+        groupFiles.push({ filename: fileName, code: code });
+
+        const blockId = 'codeblk_' + Date.now() + '_' + codeBlockCounter++;
 
         const block = document.createElement('div');
         block.className = 'code-block';
         block.innerHTML =
             '<div class="code-block-header">' +
-                '<span class="code-lang">' + escapeHtml(lang || 'kod') + '</span>' +
-                '<button type="button" class="code-copy-btn" onclick="copyCodeBlock(\'' + blockId + '\', this)">📋 Nusxa olish</button>' +
+                '<span class="code-lang">' + escapeHtml(fileName) + '</span>' +
+                '<div class="code-block-actions">' +
+                    '<button type="button" class="code-copy-btn" onclick="copyCodeBlock(\'' + blockId + '\', this)">📋 Nusxa</button>' +
+                    '<button type="button" class="code-download-btn" onclick="downloadTextFile(' + JSON.stringify(fileName) + ', document.getElementById(\'' + blockId + '\').textContent)">⬇️ Fayl</button>' +
+                '</div>' +
             '</div>' +
             '<pre><code id="' + blockId + '" class="hljs' + (lang ? ' language-' + lang : '') + '"></code></pre>';
         container.appendChild(block);
@@ -683,6 +752,16 @@ function renderAIRichText(container, text) {
 
     if (!foundBlock && container.children.length === 0) {
         container.innerHTML = formatInlineMarkdown(text);
+    }
+
+    if (groupFiles.length >= 2) {
+        notficCodeFileGroups[groupId] = groupFiles;
+        const zipBar = document.createElement('div');
+        zipBar.className = 'code-zip-bar';
+        zipBar.innerHTML =
+            '<span>📦 ' + groupFiles.length + ' ta fayldan iborat loyiha</span>' +
+            '<button type="button" class="code-zip-btn" onclick="downloadCodeGroupAsZip(\'' + groupId + '\', this)">Hammasini ZIP qilib yuklab olish</button>';
+        container.insertBefore(zipBar, container.firstChild);
     }
 }
 
