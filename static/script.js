@@ -3444,6 +3444,13 @@ window.addEventListener('appinstalled', function () {
 });
 
 window.addEventListener('DOMContentLoaded', function() {
+    // Bir martalik tuzatish: avvalgi versiyada tasodifan "qorongi" rejim
+    // standart qilib qoyilgan edi va ayrim foydalanuvchilar brauzerida
+    // saqlanib qolgan bolishi mumkin. Buni bir marta "och rang"ga qaytaramiz.
+    if (!localStorage.getItem('notfic_theme_light_reset_v1')) {
+        localStorage.setItem(THEME_KEY, 'light');
+        localStorage.setItem('notfic_theme_light_reset_v1', '1');
+    }
     applyTheme(localStorage.getItem(THEME_KEY) || 'light');
     applyStoredAccent();
     initNeuralBackground();
