@@ -2386,6 +2386,8 @@ const VOICE_ASSISTANT_KEY = 'notfic_voice_assistant_enabled';
 let voiceRecognition = null;
 let voiceAssistantActive = false;
 let voiceRestartTimer = null;
+let voiceFollowUpUntil = 0;
+const VOICE_FOLLOWUP_MS = 12000;
 
 function isVoiceAssistantSupported() {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
@@ -2539,10 +2541,15 @@ function handleVoiceCommand(transcript) {
     // Sof salomlashuv — tabiiy javob
     if (/^(salom|salomlar|assalomu[\s']?alaykum|salom notfic)[\s!.,]*$/.test(text)) {
         speakOnboardingText('Salom, qalaysiz? Sizga qanday yordam bera olaman?', 'happy');
+        voiceFollowUpUntil = Date.now() + VOICE_FOLLOWUP_MS;
         return;
     }
 
     const hadWakeWord = containsWakeWord(text);
+    // Jarvis uslubidagi ketma-ket suhbat: chaqiruv sozidan song bir necha soniya ichida
+    // yana "Hey Notfic" demasdan davom eting deyish mumkin.
+    const inFollowUp = Date.now() < voiceFollowUpUntil;
+
     if (hadWakeWord) {
         text = stripWakeWord(text).trim();
     }
@@ -2550,10 +2557,15 @@ function handleVoiceCommand(transcript) {
     if (hadWakeWord && text.length === 0) {
         speakOnboardingText('Hey sir! Tinglayapman, buyruq bering.', 'happy');
         showNotificationToast('🎙 Hey sir! Tinglayapman...');
+        voiceFollowUpUntil = Date.now() + VOICE_FOLLOWUP_MS;
         return;
     }
 
     if (!text) return;
+
+    if (hadWakeWord || inFollowUp) {
+        voiceFollowUpUntil = Date.now() + VOICE_FOLLOWUP_MS;
+    }
 
     // Tinglashni tokhtatish
     if (/tinglashni tokhtat|ovozni ochir|meni eshitma|sukut/.test(text)) {
@@ -2713,19 +2725,22 @@ function handleVoiceCommand(transcript) {
         }
     }
 
-    // Hech narsa mos kelmasa — faqat chaqiruv sozi ("Hey Notfic") aytilgan bolsa etibor beramiz
-    if (!hadWakeWord) return;
+    // Hech narsa mos kelmasa — chaqiruv sozi ("Hey Notfic") aytilgan yoki hozir
+    // "ketma-ket suhbat" oynasida bolsak davom etamiz, aks holda etibor bermaymiz
+    if (!hadWakeWord && !inFollowUp) return;
 
     // Juda qisqa/tushunarsiz gap bolsa, qayta soralaydi
     if (text.length < 4 || text.split(' ').length === 1) {
         speakOnboardingText('Kechirasiz, tushunmadim. Iltimos qayta gapiring.', 'annoyed');
+        voiceFollowUpUntil = Date.now() + VOICE_FOLLOWUP_MS;
         return;
     }
 
-    // Aks holda — xabar sifatida AI'ga yuboriladi
+    // Aks holda — xabar sifatida AI'ga yuboriladi, javob ham ovozda oqiladi
     const messageInput = document.getElementById('message-input');
     if (messageInput) {
         messageInput.value = text;
+        autoSpeakNextAIReply = true;
         sendMessage();
         showNotificationToast('🎙 Xabar sifatida yuborildi');
     }
@@ -3232,6 +3247,16 @@ async function speakOnboardingText(text, mood) {
         currentTtsAudio = null;
     }
 
+    const mic = document.getElementById('voice-mic-btn');
+    if (mic) mic.classList.add('speaking');
+
+    const onSpeechEnd = function () {
+        if (mic) mic.classList.remove('speaking');
+        if (wasListening && isVoiceAssistantEnabled()) {
+            setTimeout(startVoiceListening, 400);
+        }
+    };
+
     try {
         const res = await fetch('/api/tts', {
             method: 'POST',
@@ -3245,9 +3270,7 @@ async function speakOnboardingText(text, mood) {
             currentTtsAudio = new Audio(url);
             currentTtsAudio.onended = function () {
                 URL.revokeObjectURL(url);
-                if (wasListening && isVoiceAssistantEnabled()) {
-                    setTimeout(startVoiceListening, 400);
-                }
+                onSpeechEnd();
             };
             currentTtsAudio.onerror = currentTtsAudio.onended;
             currentTtsAudio.play();
@@ -3257,11 +3280,14 @@ async function speakOnboardingText(text, mood) {
         console.error(e);
     }
 
-    speakWithBrowserVoice(text, wasListening);
+    speakWithBrowserVoice(text, wasListening, onSpeechEnd);
 }
 
-function speakWithBrowserVoice(text, wasListening) {
-    if (!('speechSynthesis' in window)) return;
+function speakWithBrowserVoice(text, wasListening, onEnd) {
+    if (!('speechSynthesis' in window)) {
+        if (onEnd) onEnd();
+        return;
+    }
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -3275,9 +3301,7 @@ function speakWithBrowserVoice(text, wasListening) {
     else if (ruVoice) utterance.voice = ruVoice;
 
     utterance.onend = function () {
-        if (wasListening && isVoiceAssistantEnabled()) {
-            setTimeout(startVoiceListening, 400);
-        }
+        if (onEnd) onEnd();
     };
     utterance.onerror = utterance.onend;
 
