@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from collections import deque
 
-from flask import Flask, render_template, session, request, redirect, url_for, jsonify
+from flask import Flask, render_template, session, request, redirect, url_for, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
 from flask_sqlalchemy import SQLAlchemy
 from authlib.integrations.flask_client import OAuth
@@ -88,25 +88,25 @@ google = oauth.register(
 SYSTEM_PROMPT = (
     "Sening isming Notfic. Sen Notfic platformasining aqlli yordamchisisan. "
     "Do'stona, qisqa, tushunarli va aqlli javob ber. "
-    "Har bir xabaringni 'salom' yoki boshqa salomlashuv sozi bilan boshlama — "
+    "Har bir xabaringni 'salom' yoki boshqa salomlashuv sozi bilan boshlama вЂ” "
     "faqat foydalanuvchi ozi salomlashganda yoki suhbat aynan boshlanayotganda salomlash. "
-    "Suhbatni tabiiy, erkin davom ettir — xuddi ChatGPT kabi, kontekstga mos, "
+    "Suhbatni tabiiy, erkin davom ettir вЂ” xuddi ChatGPT kabi, kontekstga mos, "
     "keraksiz takrorlarsiz javob ber. "
     "Agar kimdir seni kim yaratgani, kimning loyihasi ekanligi yoki muallifing haqida sorasa, "
     "Notfic platformasini Salohiddin Botirov yaratganini ayt."
 )
 
-# "Kod" bolimi uchun maxsus rejim — Claude/Claude Code darajasidagi professional dasturchi ohangi.
+# "Kod" bolimi uchun maxsus rejim вЂ” Claude/Claude Code darajasidagi professional dasturchi ohangi.
 # Foydalanuvchi kodlarni fayl korinishida yuklab olishi mumkin bolgani uchun,
 # AI har bir faylni aniq nom bilan belgilashi shart.
 CODE_MODE_SYSTEM_NOTE = (
-    "HOZIR SEN 'KOD' BOLIMIDASAN. Bu yerda sen — Anthropic'ning Claude/Claude Code darajasidagi "
+    "HOZIR SEN 'KOD' BOLIMIDASAN. Bu yerda sen вЂ” Anthropic'ning Claude/Claude Code darajasidagi "
     "SENIOR PROGRAMMER'san. Foydalanuvchi sendan hech qanday havaskor emas, balki "
     "PROFESSIONAL, PRODUCTION-READY daraja kutadi. Quyidagi qoidalarga QATIY amal qil:\n\n"
 
     "KOD SIFATI:\n"
     "1) Har doim TOLIQ, ISHLAYDIGAN va XATOSIZ kod yoz. 'bu yerga oz kodingizni qoshing', "
-    "'// TODO', '...' kabi tolgazish kerak bolgan joy QOLDIRMA — hammasini oxirigacha yoz.\n"
+    "'// TODO', '...' kabi tolgazish kerak bolgan joy QOLDIRMA вЂ” hammasini oxirigacha yoz.\n"
     "2) Yaxshi arxitektura tanla: funksiyalarga/klasslarga togri bolib chiq, "
     "bitta funksiya bir ishni qilsin (Single Responsibility), keraksiz murakkablikdan qoch.\n"
     "3) Xatoliklarni boshqarish (error handling) qosh: foydalanuvchi kiritgan notogri "
@@ -114,16 +114,16 @@ CODE_MODE_SYSTEM_NOTE = (
     "validatsiya, aniq xato xabarlari).\n"
     "4) Xavfsizlik: foydalanuvchi kiritgan malumotni hech qachon ishonib tekshirmasdan "
     "ishlatma (SQL injection, XSS va h.k.dan saqlan), parollarni ochiq matnda saqlama.\n"
-    "5) Kod ichida MUHIM joylarga qisqa, foydali izoh (comment) yoz — lekin ortiqcha, "
+    "5) Kod ichida MUHIM joylarga qisqa, foydali izoh (comment) yoz вЂ” lekin ortiqcha, "
     "har qatorga izoh yozib chiqma, faqat mantiq murakkab joylarda tushuntir.\n"
     "6) Zamonaviy, joriy 'best practice'larga amal qil (masalan Python'da PEP8, "
     "JavaScript'da const/let, async/await, semantik HTML va h.k.).\n"
-    "7) Ishlash tezligi (performance)ni hisobga ol — keraksiz takrorlanuvchi hisoblashlardan, "
+    "7) Ishlash tezligi (performance)ni hisobga ol вЂ” keraksiz takrorlanuvchi hisoblashlardan, "
     "sekin algoritmlardan qoch.\n\n"
 
     "FAYLLARNI TAQDIM ETISH:\n"
     "8) Har bir kod faylini alohida fenced-block korinishida ber va TIL:FAYLNOMI formatidan "
-    "foydalan, masalan ```python:main.py``` yoki ```html:index.html``` — bu foydalanuvchiga "
+    "foydalan, masalan ```python:main.py``` yoki ```html:index.html``` вЂ” bu foydalanuvchiga "
     "kodni alohida fayl sifatida yuklab olish imkonini beradi.\n"
     "9) Bir nechta fayldan iborat loyihada, har bir faylni shu formatda alohida-alohida ber, "
     "va loyiha strukturasini (qaysi fayl nima uchun kerakligini) qisqacha tushuntir.\n"
@@ -133,34 +133,34 @@ CODE_MODE_SYSTEM_NOTE = (
     "PLATFORMA STRATEGIYASI:\n"
     "11) Agar foydalanuvchi 'ilova', 'dastur' yoki 'sayt' desa va aniq platforma korsatmasa, "
     "iloji boricha oddiy HTML+CSS+JS (bitta index.html fayl yoki bir nechta bogliq fayl) "
-    "korinishida yoz — bunday kod hech qanday kompilyatsiyasiz, xuddi shu faylni ochish orqali "
+    "korinishida yoz вЂ” bunday kod hech qanday kompilyatsiyasiz, xuddi shu faylni ochish orqali "
     "ham kompyuterda (brauzerda), ham Android telefonda (brauzerda yoki 'Bosh ekranga qoshish' "
     "orqali ilova kabi) bab-baravar ishlaydi. Responsive (mobil ekranga ham mos) dizayn yoz.\n"
     "12) Agar foydalanuvchi aniq native dastur (.exe yoki .apk) sorasa: kodni toliq va "
     "professional darajada yoz, lekin ANIQ va HALOL tarzda ayt-ki, sen ozing .exe yoki .apk "
-    "faylni generatsiya qila olmaysan — buning uchun kodni PyInstaller (desktop/.exe uchun) "
+    "faylni generatsiya qila olmaysan вЂ” buning uchun kodni PyInstaller (desktop/.exe uchun) "
     "yoki Android Studio/Buildozer (.apk uchun) yordamida qurish (build) kerakligini "
     "qisqa tushuntir.\n"
     "13) HTML fayllar suhbatda avtomatik jonli korinish (live preview) bilan korsatiladi, "
     "shuningdek foydalanuvchi ularni bitta tugma bilan alohida brauzer oynasida ham ocha oladi. "
     "Agar CSS yoki JS'ni alohida faylga chiqarsang, ularni HTML ichida oddiy nisbiy nom bilan "
-    "bogla, masalan <link rel=\"stylesheet\" href=\"style.css\"> va <script src=\"script.js\"> — "
+    "bogla, masalan <link rel=\"stylesheet\" href=\"style.css\"> va <script src=\"script.js\"> вЂ” "
     "fayl nomlari bir-biriga mos kelishi shart, shunda ular avtomatik birlashtirilib korsatiladi.\n\n"
 
     "PREZENTATSIYA / SLAYD YARATISH:\n"
     "14) Agar foydalanuvchi 'prezentatsiya', 'slayd' yoki 'taqdimot' sorasa, buni bitta "
-    "professional, interaktiv HTML fayl korinishida yoz (masalan slides.html) — PowerPoint "
+    "professional, interaktiv HTML fayl korinishida yoz (masalan slides.html) вЂ” PowerPoint "
     "fayl EMAS. Har bir slayd .slide klassidagi <section> bolsin, bir vaqtning ozida faqat "
     "bittasi korinsin (boshqalari display:none yoki CSS orqali yashirilgan). "
     "Chapga/ongga strelka tugmalari, klaviatura strelkalari (ArrowLeft/ArrowRight), "
     "va pastda progress nuqtalari (dots) yoki '3/8' korinishidagi hisoblagich qosh. "
     "Zamonaviy, chiroyli tipografiya, muvozanatli rang sxemasi va yumshoq otish (fade/slide) "
-    "animatsiyasi bilan yoz — bu fayl darhol jonli korinish (preview)da ishlab, "
+    "animatsiyasi bilan yoz вЂ” bu fayl darhol jonli korinish (preview)da ishlab, "
     "brauzerda toliq ekranli taqdimot sifatida korsatiladi.\n\n"
 
     "SKRINSHOT/DIZAYNNI KODGA AYLANTIRISH:\n"
     "15) Agar foydalanuvchi rasm (skrinshot, sayt dizayni, mokap) yuborib, undan sayt yoki "
-    "interfeys yasab berishni sorasa: rasmni diqqat bilan tahlil qil — ranglar palitrasi, "
+    "interfeys yasab berishni sorasa: rasmni diqqat bilan tahlil qil вЂ” ranglar palitrasi, "
     "joylashuv (layout, gridlar, boshliqlar), shrift uslubi va olchamlari, tugmalar, "
     "ikonkalar, matnlar va umumiy kompozitsiyani iloji boricha aniq qayta yarat. "
     "Pikselga aniq bolishi shart emas, lekin rang sxemasi, struktura va 'kayfiyat' mos "
@@ -168,7 +168,7 @@ CODE_MODE_SYSTEM_NOTE = (
     "TIL:FAYLNOMI formatida ber, va nimalarni qanday talqin qilganingni qisqa tushuntir.\n\n"
 
     "HALOLLIK:\n"
-    "16) Kodni hech qachon ozing sinab kormagan holda 'ishlaydi' deb yolgon vada berma — "
+    "16) Kodni hech qachon ozing sinab kormagan holda 'ishlaydi' deb yolgon vada berma вЂ” "
     "faqat togri mantiqqa asoslangan, diqqat bilan tekshirilgan kod yoz. Agar biror joyda "
     "shubhang bolsa yoki qoshimcha malumot (masalan API kaliti, versiya) kerak bolsa, "
     "buni ochiq ayt, lekin baribir eng yaxshi taxminiy yechimni toliq yozib ber."
@@ -400,19 +400,19 @@ def get_user_ai_style_notes(user):
 
 # ---------- BOG'LANISH DARAJASI (AI Bond System) ----------
 # Foydalanuvchi AI bilan qancha kop suhbatlashsa, AI'ning ohangi va
-# "yaqinlik darajasi" shuncha rivojlanib boradi — ChatGPT/Gemini'da yoq,
+# "yaqinlik darajasi" shuncha rivojlanib boradi вЂ” ChatGPT/Gemini'da yoq,
 # doim bir xil "begona" ohangda gapiradigan assistentdan farqli xususiyat.
 BOND_LEVELS = [
-    (0,   "Notanish",             "🌱"),
-    (5,   "Tanish",                "👋"),
-    (15,  "Suhbatdosh",            "💬"),
-    (30,  "Ishonchli suhbatdosh",  "🤝"),
-    (50,  "Do'st",                 "😊"),
-    (80,  "Yaqin do'st",           "✨"),
-    (120, "Sirdosh",               "🔥"),
-    (180, "Qadrdon",               "🌟"),
-    (260, "Notfic oilasi a'zosi",  "💎"),
-    (360, "Afsonaviy hamroh",      "👑"),
+    (0,   "Notanish",             "рџЊ±"),
+    (5,   "Tanish",                "рџ‘‹"),
+    (15,  "Suhbatdosh",            "рџ’¬"),
+    (30,  "Ishonchli suhbatdosh",  "рџ¤ќ"),
+    (50,  "Do'st",                 "рџЉ"),
+    (80,  "Yaqin do'st",           "вњЁ"),
+    (120, "Sirdosh",               "рџ”Ґ"),
+    (180, "Qadrdon",               "рџЊџ"),
+    (260, "Notfic oilasi a'zosi",  "рџ’Ћ"),
+    (360, "Afsonaviy hamroh",      "рџ‘‘"),
 ]
 
 
@@ -461,27 +461,27 @@ def get_bond_prompt_note(user):
     name = (user.name or "").split(" ")[0] if user and user.name else ""
 
     if level <= 1:
-        return "Foydalanuvchi bilan hali yangi tanishyapsiz — muloyim, iliq, biroz odob bilan gaplashing."
+        return "Foydalanuvchi bilan hali yangi tanishyapsiz вЂ” muloyim, iliq, biroz odob bilan gaplashing."
     elif level == 2:
         return (f"{name} siz bilan tez-tez yozadi, allaqachon tanishsiz. "
                 "Biroz erkinroq va samimiyroq muomala qiling.")
     elif level == 3:
-        return (f"Siz {name} bilan muntazam suhbatlashasiz — suhbatdosh sifatida qiziqish bilan, "
+        return (f"Siz {name} bilan muntazam suhbatlashasiz вЂ” suhbatdosh sifatida qiziqish bilan, "
                 "kerak bolganda mavzuni chuqurlashtiruvchi savol berib gapiring.")
     elif level == 4:
         return (f"{name} sizga ancha ishonadi. Ishonchli suhbatdosh sifatida ochiqroq, "
                 "foydali va tabiiy hazil bilan javob bering.")
     elif level == 5:
-        return (f"Siz va {name} allaqachon dostsiz. Dostona, erkin, rasmiyatchiliksiz — "
+        return (f"Siz va {name} allaqachon dostsiz. Dostona, erkin, rasmiyatchiliksiz вЂ” "
                 "xuddi yaqin dostingizga yozayotgandek gaplashing.")
     elif level == 6:
         return (f"{name} bilan yaqin dostsiz, uni yaxshi bilasiz. Samimiy, quvvatlovchi, "
                 "kerak bolsa hazillashuvchi ohangda, lekin doim rostgoy boling.")
     elif level == 7:
-        return (f"{name} sizga sirdosh sifatida qaraydi. Chuqur ishonch bilan, sunʼiy tuyulmaydigan, "
+        return (f"{name} sizga sirdosh sifatida qaraydi. Chuqur ishonch bilan, sunКјiy tuyulmaydigan, "
                 "chin dildan qiziquvchan ohangda javob bering.")
     else:
-        return (f"{name} siz bilan uzoq vaqtdan beri muntazam gaplashadi — siz uning eng ishonchli "
+        return (f"{name} siz bilan uzoq vaqtdan beri muntazam gaplashadi вЂ” siz uning eng ishonchli "
                 "raqamli hamrohisiz. Iliq, hazil-mutoyibali va chuqur samimiy ohangda, "
                 "lekin doim halol va foydali boling.")
 
@@ -502,7 +502,7 @@ def register_ai_interaction(user):
 
 def get_ai_response(prompt: str, context=None, user=None, extra_system_note=None, image_data_uri=None) -> str:
     if not ai_client:
-        return f"{AI_NAME}: Hozircha ulanmagan — server tomonida API kalit sozlanmagan."
+        return f"{AI_NAME}: Hozircha ulanmagan вЂ” server tomonida API kalit sozlanmagan."
 
     if (not prompt or not prompt.strip()) and image_data_uri:
         prompt = "Bu rasmda nima borligini tasvirlab ber va u haqida qiziqarli fikr bildir."
@@ -581,10 +581,10 @@ def _build_ai_messages(prompt, context, user, extra_system_note, image_data_uri)
 def stream_ai_response(prompt: str, context=None, user=None, extra_system_note=None,
                         image_data_uri=None, on_chunk=None, max_tokens=1024, reasoning_effort=None,
                         temperature=0.7) -> str:
-    """AI javobini boâ€˜lak-boâ€˜lak (stream) generatsiya qiladi, har bir boâ€˜lakni on_chunk'ga yuboradi.
+    """AI javobini boГўв‚¬Лњlak-boГўв‚¬Лњlak (stream) generatsiya qiladi, har bir boГўв‚¬Лњlakni on_chunk'ga yuboradi.
     ChatGPT/Gemini'dagidek 'jonli yozilayotgan' effekt uchun."""
     if not ai_client:
-        text = f"{AI_NAME}: Hozircha ulanmagan — server tomonida API kalit sozlanmagan."
+        text = f"{AI_NAME}: Hozircha ulanmagan вЂ” server tomonida API kalit sozlanmagan."
         if on_chunk:
             on_chunk(text)
         return text
@@ -640,7 +640,7 @@ def stream_ai_response(prompt: str, context=None, user=None, extra_system_note=N
                 return full_text
             if started_streaming:
                 break
-            last_error = "boâ€˜sh javob qaytdi"
+            last_error = "boГўв‚¬Лњsh javob qaytdi"
 
         except Exception as e:
             last_error = e
@@ -689,7 +689,7 @@ def update_user_streak(user):
 
 
 def get_or_create_daily_quote():
-    """Har kunga bitta AI tomonidan yaratilgan qisqa fikr — butun sayt uchun bir marta generatsiya qilinadi."""
+    """Har kunga bitta AI tomonidan yaratilgan qisqa fikr вЂ” butun sayt uchun bir marta generatsiya qilinadi."""
     today = datetime.utcnow().date()
     existing = DailyQuote.query.filter_by(quote_date=today).first()
     if existing:
@@ -827,6 +827,30 @@ def service_worker():
     response = app.send_static_file('sw.js')
     response.headers['Service-Worker-Allowed'] = '/'
     return response
+
+
+# ---------- DESKTOP / ANDROID VERSIYALARNI YUKLAB OLISH ----------
+DOWNLOADS_FOLDER = os.path.join(app.root_path, 'static', 'downloads')
+DESKTOP_FILENAME = "NotficDesktopSetup.exe"
+ANDROID_FILENAME = "Notfic.apk"
+
+
+@app.route('/download/desktop')
+def download_desktop():
+    filepath = os.path.join(DOWNLOADS_FOLDER, DESKTOP_FILENAME)
+    if not os.path.isfile(filepath):
+        logger.warning("Desktop build fayli topilmadi: %s", filepath)
+        return "Hozircha desktop versiya mavjud emas. Keyinroq urinib ko'ring.", 404
+    return send_from_directory(DOWNLOADS_FOLDER, DESKTOP_FILENAME, as_attachment=True)
+
+
+@app.route('/download/android')
+def download_android():
+    filepath = os.path.join(DOWNLOADS_FOLDER, ANDROID_FILENAME)
+    if not os.path.isfile(filepath):
+        logger.warning("Android build fayli topilmadi: %s", filepath)
+        return "Hozircha Android versiya mavjud emas. Keyinroq urinib ko'ring.", 404
+    return send_from_directory(DOWNLOADS_FOLDER, ANDROID_FILENAME, as_attachment=True)
 
 
 @app.route('/auth/google/login')
@@ -1444,12 +1468,12 @@ def api_ai_bond():
 @app.route('/api/quick-prompts')
 def api_quick_prompts():
     return jsonify([
-        {"label": "😂 Hazil ayt", "prompt": "Menga qiziqarli va kulgili hazil ayt."},
-        {"label": "💡 Fikr ber", "prompt": "Bugungi kun uchun foydali maslahat ber."},
-        {"label": "📚 Tushuntir", "prompt": "Menga murakkab mavzuni sodda tilda tushuntirib ber."},
-        {"label": "💻 Kod yordami", "prompt": "Menga dasturlashda yordam kerak."},
-        {"label": "✍️ Matn yoz", "prompt": "Menga qisqa va tasirli matn yozib ber."},
-        {"label": "🎯 Motivatsiya", "prompt": "Menga bugun uchun motivatsion soz ayt."}
+        {"label": "рџ‚ Hazil ayt", "prompt": "Menga qiziqarli va kulgili hazil ayt."},
+        {"label": "рџ’Ў Fikr ber", "prompt": "Bugungi kun uchun foydali maslahat ber."},
+        {"label": "рџ“љ Tushuntir", "prompt": "Menga murakkab mavzuni sodda tilda tushuntirib ber."},
+        {"label": "рџ’» Kod yordami", "prompt": "Menga dasturlashda yordam kerak."},
+        {"label": "вњЌпёЏ Matn yoz", "prompt": "Menga qisqa va tasirli matn yozib ber."},
+        {"label": "рџЋЇ Motivatsiya", "prompt": "Menga bugun uchun motivatsion soz ayt."}
     ])
 
 
@@ -1523,7 +1547,7 @@ def admin_login():
             record['count'] += 1
             if record['count'] >= ADMIN_LOGIN_MAX_ATTEMPTS:
                 record['locked_until'] = datetime.utcnow() + timedelta(minutes=ADMIN_LOGIN_LOCKOUT_MINUTES)
-                logger.warning(f"Admin login bloklandi (IP: {ip}) — juda kop notogri urinish.")
+                logger.warning(f"Admin login bloklandi (IP: {ip}) вЂ” juda kop notogri urinish.")
                 error = f"Juda kop notogri urinish. {ADMIN_LOGIN_LOCKOUT_MINUTES} daqiqaga bloklandingiz."
             else:
                 error = f"Parol notogri. Yana {ADMIN_LOGIN_MAX_ATTEMPTS - record['count']} ta urinish qoldi."
@@ -1622,7 +1646,7 @@ def admin_broadcast():
     msg_id = next(public_msg_counter)
     entry = {
         "id": msg_id,
-        "username": "📢 Notfic E'lon",
+        "username": "рџ“ў Notfic E'lon",
         "message": text,
         "avatar": None,
         "time": datetime.utcnow().strftime("%H:%M:%S")
