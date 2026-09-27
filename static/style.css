@@ -2322,18 +2322,9 @@ button:focus-visible, .chat-item:focus-visible { outline-offset: 3px; }
     animation: mic-pulse 1.4s ease-in-out infinite;
 }
 
-.voice-mic-btn.speaking {
-    animation: mic-speaking-pulse 0.9s ease-in-out infinite;
-}
-
 @keyframes mic-pulse {
     0%, 100% { box-shadow: var(--shadow-lg), 0 0 0 0 rgba(139,107,255,0.5); }
     50% { box-shadow: var(--shadow-lg), 0 0 0 12px rgba(139,107,255,0); }
-}
-
-@keyframes mic-speaking-pulse {
-    0%, 100% { box-shadow: var(--shadow-lg), 0 0 0 0 rgba(30,58,95,0.55); transform: scale(1); }
-    50% { box-shadow: var(--shadow-lg), 0 0 0 10px rgba(30,58,95,0); transform: scale(1.06); }
 }
 
 .voice-preview-bubble {

@@ -19,7 +19,7 @@ let isConnected = false;
 const sentMessageIds = new Set();
 let lastRenderedKey = null;
 let cachedFriendsList = [];
-const REACTION_EMOJIS = ['рџ‘Ќ', 'вќ¤пёЏ', 'рџ‚', 'рџ®', 'рџў'];
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢'];
 
 /* ---------- RASM BIRIKTIRISH (AI suhbatiga) ---------- */
 const MAX_CHAT_IMAGE_SIZE = 4 * 1024 * 1024;
@@ -43,7 +43,7 @@ function handleImageAttach(event) {
     reader.onload = function (e) {
         attachedImageDataUri = e.target.result;
         document.getElementById('image-preview-thumb').src = attachedImageDataUri;
-        document.getElementById('image-preview-name').textContent = file.name.length > 24 ? file.name.slice(0, 24) + 'вЂ¦' : file.name;
+        document.getElementById('image-preview-name').textContent = file.name.length > 24 ? file.name.slice(0, 24) + '…' : file.name;
         document.getElementById('image-preview-bar').style.display = 'flex';
     };
     reader.readAsDataURL(file);
@@ -55,7 +55,7 @@ function clearAttachedImage() {
     document.getElementById('image-preview-thumb').src = '';
 }
 
-/* ---------- OVOZLI KIRITISH (Push-to-talk) вЂ” ChatGPT uslubidagi mikrofon tugmasi ---------- */
+/* ---------- OVOZLI KIRITISH (Push-to-talk) — ChatGPT uslubidagi mikrofon tugmasi ---------- */
 let pushToTalkRecognition = null;
 let pushToTalkActive = false;
 let pushToTalkFinalText = '';
@@ -78,7 +78,7 @@ function startPushToTalk() {
         return;
     }
 
-    // Doimiy tinglovchi ("Hey Notfic") ishlab tursa, ikkalasi bir vaqtda ishlay olmaydi вЂ”
+    // Doimiy tinglovchi ("Hey Notfic") ishlab tursa, ikkalasi bir vaqtda ishlay olmaydi —
     // vaqtincha tokhtatib turamiz, tugagach qayta yoqamiz.
     wasWakeWordActiveBeforePTT = voiceAssistantActive;
     if (voiceAssistantActive) stopVoiceListening();
@@ -127,7 +127,7 @@ function startPushToTalk() {
         pushToTalkRecognition.start();
         pushToTalkActive = true;
         updatePushToTalkUI();
-        showNotificationToast('рџЋ™ Tinglayapman... gapiring');
+        showNotificationToast('🎙 Tinglayapman... gapiring');
     } catch (e) {
         console.error(e);
     }
@@ -191,7 +191,7 @@ const BOND_GREETINGS = [
     "Yana korishganimizdan xursandman! Bugun nima gaplashamiz?",
     "Sog'indim-ku! Yozganingdan xursand boldim.",
     "Sen bilan gaplashish kayfiyatimni kotaradi. Qalaysan bugun?",
-    "Yana shu yerdasan вЂ” bu meni juda xursand qiladi.",
+    "Yana shu yerdasan — bu meni juda xursand qiladi.",
     "Bugun senga qanday yordam bera olaman, qadrdonim?"
 ];
 
@@ -222,7 +222,7 @@ function openBondModal() {
     document.getElementById('bond-modal-sub').textContent = 'Daraja ' + currentBondInfo.level;
     document.getElementById('bond-modal-fill').style.width = currentBondInfo.progress + '%';
     document.getElementById('bond-modal-progress-text').textContent = currentBondInfo.is_max
-        ? "Eng yuqori darajaga yetdingiz! рџ‘‘"
+        ? "Eng yuqori darajaga yetdingiz! 👑"
         : (currentBondInfo.next_threshold - currentBondInfo.xp) + " ta xabar qoldi keyingi darajagacha";
     document.getElementById('bond-modal').classList.add('open');
 }
@@ -315,10 +315,10 @@ function switchToPublic() {
 }
 
 function switchToCodeChat() {
-    // "Kod" bolimiga har safar kirganda suhbat toza (bosh) holatda boshlanadi вЂ”
+    // "Kod" bolimiga har safar kirganda suhbat toza (bosh) holatda boshlanadi —
     // avvalgi yozishmalar saqlanmaydi.
     const chats = loadChats();
-    chats[CODE_CHAT_ID] = { id: CODE_CHAT_ID, title: 'рџ’» Kod yordamchisi', messages: [] };
+    chats[CODE_CHAT_ID] = { id: CODE_CHAT_ID, title: '💻 Kod yordamchisi', messages: [] };
     saveChats(chats);
 
     setActiveChatId(CODE_CHAT_ID);
@@ -331,7 +331,7 @@ function switchToCodeChat() {
 function updateHeader() {
     document.getElementById('code-chat-item').classList.remove('active');
     if (isPublicActive()) {
-        chatHeaderTitle.textContent = 'рџ’¬ Ochiq Suhbat';
+        chatHeaderTitle.textContent = '💬 Ochiq Suhbat';
         document.getElementById('public-chat-item').classList.add('active');
     } else {
         const activeId = getActiveChatId();
@@ -340,7 +340,7 @@ function updateHeader() {
             return;
         }
         if (activeId === CODE_CHAT_ID) {
-            chatHeaderTitle.textContent = 'рџ’» Kod yordamchisi';
+            chatHeaderTitle.textContent = '💻 Kod yordamchisi';
             document.getElementById('public-chat-item').classList.remove('active');
             document.getElementById('code-chat-item').classList.add('active');
             renderBondBadge(currentBondInfo);
@@ -348,7 +348,7 @@ function updateHeader() {
         }
         const chats = loadChats();
         const chat = chats[activeId];
-        chatHeaderTitle.textContent = 'рџ¤– ' + (chat ? chat.title : 'AI suhbat');
+        chatHeaderTitle.textContent = '🤖 ' + (chat ? chat.title : 'AI suhbat');
         document.getElementById('public-chat-item').classList.remove('active');
     }
     renderBondBadge(currentBondInfo);
@@ -382,7 +382,7 @@ function makeChatListItem(id, chats, activeId) {
     const menuBtn = document.createElement('button');
     menuBtn.className = 'chat-item-menu-btn';
     menuBtn.setAttribute('aria-label', 'Suhbat menyusi');
-    menuBtn.innerHTML = 'в‹Ї';
+    menuBtn.innerHTML = '⋯';
     menuBtn.onclick = function (event) {
         event.stopPropagation();
         document.querySelectorAll('.chat-item-menu-wrap.open').forEach(function (w) {
@@ -523,16 +523,16 @@ function renderMessages() {
         if (!chat || chat.messages.length === 0) {
             const emptyHtml = (activeId === CODE_CHAT_ID)
                 ? '<div class="empty-state code-empty-state">' +
-                      '<div class="code-empty-icon">рџ’»</div>' +
+                      '<div class="code-empty-icon">💻</div>' +
                       '<h2>Kod yordamchisi</h2>' +
-                      '<p>Loyihangiz, xatoligingiz yoki yozmoqchi bolgan dasturingiz haqida yozing вЂ” ' +
+                      '<p>Loyihangiz, xatoligingiz yoki yozmoqchi bolgan dasturingiz haqida yozing — ' +
                       'professional, toliq va ishlaydigan kod yozib beraman.</p>' +
                       '<div class="code-empty-examples">' +
-                          '<button type="button" class="code-example-chip code-example-chip-special" onclick="useScreenshotToCodePrompt()">рџ“ё Skrinshotdan sayt yasash</button>' +
-                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">рџ“ќ Vazifalar royxati ilovasi yasab ber</button>' +
-                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">рџ“Љ Kompaniyam haqida 5 slaydli prezentatsiya yasab ber</button>' +
-                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">рџ§® Python\'da kalkulyator dasturi yoz</button>' +
-                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">рџЊђ Portfolio sayti yasab ber</button>' +
+                          '<button type="button" class="code-example-chip code-example-chip-special" onclick="useScreenshotToCodePrompt()">📸 Skrinshotdan sayt yasash</button>' +
+                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">📝 Vazifalar royxati ilovasi yasab ber</button>' +
+                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">📊 Kompaniyam haqida 5 slaydli prezentatsiya yasab ber</button>' +
+                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">🧮 Python\'da kalkulyator dasturi yoz</button>' +
+                          '<button type="button" class="code-example-chip" onclick="useCodeExamplePrompt(this)">🌐 Portfolio sayti yasab ber</button>' +
                       '</div>' +
                   '</div>'
                 : '<div class="empty-state"><h2>Nima bilan yordam beray?</h2><p>Bu suhbat faqat sizga korinadi.</p></div>';
@@ -549,7 +549,7 @@ function renderMessages() {
 
 function avatarHtmlFor(data) {
     if (data.isAI) {
-        return '<div class="msg-avatar msg-avatar-ai">вљЎ</div>';
+        return '<div class="msg-avatar msg-avatar-ai">⚡</div>';
     }
     if (data.avatar) {
         return '<img src="' + data.avatar + '" class="msg-avatar" alt="">';
@@ -562,13 +562,13 @@ function buildFeedbackHtml(data) {
     const p = encodeURIComponent(data.prompt || '');
     const r = encodeURIComponent(data.message || '');
     const ttsBtn = TTS_ENABLED
-        ? '<button class="feedback-btn tts-btn" onclick="playAIMessage(decodeURIComponent(\'' + r + '\'),this)" aria-label="Tinglash">рџ”Љ</button>'
+        ? '<button class="feedback-btn tts-btn" onclick="playAIMessage(decodeURIComponent(\'' + r + '\'),this)" aria-label="Tinglash">🔊</button>'
         : '';
     return '<div class="ai-feedback">' +
         ttsBtn +
-        '<button class="feedback-btn" onclick="sendAIFeedback(\'' + p + '\',\'' + r + '\',1,this)" aria-label="Yoqdi">рџ‘Ќ</button>' +
-        '<button class="feedback-btn" onclick="sendAIFeedback(\'' + p + '\',\'' + r + '\',-1,this)" aria-label="Yoqmadi">рџ‘Ћ</button>' +
-        '<button class="feedback-btn" onclick="saveMessageToList(decodeURIComponent(\'' + r + '\'),this)" aria-label="Saqlash">рџ”–</button>' +
+        '<button class="feedback-btn" onclick="sendAIFeedback(\'' + p + '\',\'' + r + '\',1,this)" aria-label="Yoqdi">👍</button>' +
+        '<button class="feedback-btn" onclick="sendAIFeedback(\'' + p + '\',\'' + r + '\',-1,this)" aria-label="Yoqmadi">👎</button>' +
+        '<button class="feedback-btn" onclick="saveMessageToList(decodeURIComponent(\'' + r + '\'),this)" aria-label="Saqlash">🔖</button>' +
         '</div>';
 }
 
@@ -579,7 +579,7 @@ async function playAIMessage(text, btnEl) {
         if (activeAIAudio) activeAIAudio.pause();
         activeAIAudio = null;
         btnEl.classList.remove('tts-playing');
-        btnEl.textContent = 'рџ”Љ';
+        btnEl.textContent = '🔊';
         return;
     }
 
@@ -588,11 +588,11 @@ async function playAIMessage(text, btnEl) {
         activeAIAudio = null;
         document.querySelectorAll('.tts-btn.tts-playing').forEach(function (b) {
             b.classList.remove('tts-playing');
-            b.textContent = 'рџ”Љ';
+            b.textContent = '🔊';
         });
     }
 
-    btnEl.textContent = 'вЏі';
+    btnEl.textContent = '⏳';
     btnEl.disabled = true;
 
     // Boglanish darajasi yuqori bolsa, AI ovozi ilikroq (happy) ohangda eshittiriladi
@@ -612,19 +612,19 @@ async function playAIMessage(text, btnEl) {
         activeAIAudio = audio;
 
         btnEl.disabled = false;
-        btnEl.textContent = 'вЏё';
+        btnEl.textContent = '⏸';
         btnEl.classList.add('tts-playing');
 
         audio.play();
         audio.onended = function () {
             btnEl.classList.remove('tts-playing');
-            btnEl.textContent = 'рџ”Љ';
+            btnEl.textContent = '🔊';
             URL.revokeObjectURL(url);
             if (activeAIAudio === audio) activeAIAudio = null;
         };
     } catch (e) {
         btnEl.disabled = false;
-        btnEl.textContent = 'рџ”Љ';
+        btnEl.textContent = '🔊';
         showNotificationToast('Ovozni yuklab bolmadi');
     }
 }
@@ -661,7 +661,7 @@ function buildReactionHtml(data) {
     const current = data.reaction || '';
     const badge = current
         ? '<span class="msg-reaction-badge" onclick="toggleReactionPicker(this)">' + current + '</span>'
-        : '<button class="reaction-add-btn" onclick="toggleReactionPicker(this)">рџ™‚+</button>';
+        : '<button class="reaction-add-btn" onclick="toggleReactionPicker(this)">🙂+</button>';
     const options = REACTION_EMOJIS.map(function (e) {
         return '<span class="reaction-option" onclick="pickReaction(this,\'' + e + '\')">' + e + '</span>';
     }).join('');
@@ -782,7 +782,7 @@ function fileDisplayName(filename) {
 
 function fileTypeLabel(ext) {
     if (!ext) return 'Fayl';
-    if (ext === 'html' || ext === 'css') return 'Code В· ' + ext.toUpperCase();
+    if (ext === 'html' || ext === 'css') return 'Code · ' + ext.toUpperCase();
     return ext.toUpperCase();
 }
 
@@ -812,7 +812,7 @@ async function downloadCodeGroupAsZip(groupId, btn) {
         return;
     }
     const original = btn.textContent;
-    btn.textContent = 'вЏі Tayyorlanmoqda...';
+    btn.textContent = '⏳ Tayyorlanmoqda...';
     btn.disabled = true;
     try {
         const zip = new window.JSZip();
@@ -868,13 +868,13 @@ function renderAIRichText(container, text) {
         const isHtml = (lang === 'html' || /\.html?$/i.test(fileName));
 
         const previewBtnHtml = isHtml
-            ? '<button type="button" class="code-preview-btn" id="previewbtn_' + blockId + '" onclick="toggleCodePreview(\'' + blockId + '\')">в–¶пёЏ Korish</button>' +
-              '<button type="button" class="code-open-browser-btn" id="openbrowserbtn_' + blockId + '">рџЊђ Brauzerda ochish</button>'
+            ? '<button type="button" class="code-preview-btn" id="previewbtn_' + blockId + '" onclick="toggleCodePreview(\'' + blockId + '\')">▶️ Korish</button>' +
+              '<button type="button" class="code-open-browser-btn" id="openbrowserbtn_' + blockId + '">🌐 Brauzerda ochish</button>'
             : '';
         const previewWrapHtml = isHtml
             ? '<div class="code-preview-wrap" id="preview_' + blockId + '" style="display:none">' +
-                  '<div class="code-preview-toolbar"><span>рџ–ҐпёЏ Onlayn korinish</span>' +
-                  '<button type="button" class="code-preview-close" onclick="toggleCodePreview(\'' + blockId + '\')">вњ• Yopish</button></div>' +
+                  '<div class="code-preview-toolbar"><span>🖥️ Onlayn korinish</span>' +
+                  '<button type="button" class="code-preview-close" onclick="toggleCodePreview(\'' + blockId + '\')">✕ Yopish</button></div>' +
                   '<div class="code-preview-slot" id="previewslot_' + blockId + '"></div>' +
               '</div>'
             : '';
@@ -886,8 +886,8 @@ function renderAIRichText(container, text) {
                 '<span class="code-lang">' + escapeHtml(fileName) + '</span>' +
                 '<div class="code-block-actions">' +
                     previewBtnHtml +
-                    '<button type="button" class="code-copy-btn" onclick="copyCodeBlock(\'' + blockId + '\', this)">рџ“‹ Nusxa</button>' +
-                    '<button type="button" class="code-download-btn" onclick="downloadTextFile(' + JSON.stringify(fileName) + ', document.getElementById(\'' + blockId + '\').textContent)">в¬‡пёЏ Fayl</button>' +
+                    '<button type="button" class="code-copy-btn" onclick="copyCodeBlock(\'' + blockId + '\', this)">📋 Nusxa</button>' +
+                    '<button type="button" class="code-download-btn" onclick="downloadTextFile(' + JSON.stringify(fileName) + ', document.getElementById(\'' + blockId + '\').textContent)">⬇️ Fayl</button>' +
                 '</div>' +
             '</div>' +
             '<pre><code id="' + blockId + '" class="hljs' + (lang ? ' language-' + lang : '') + '"></code></pre>' +
@@ -921,7 +921,7 @@ function renderAIRichText(container, text) {
         container.innerHTML = formatInlineMarkdown(text);
     }
 
-    // HTML bloklari uchun jonli korinish (preview) iframe'ini tayyorlab qoyamiz вЂ”
+    // HTML bloklari uchun jonli korinish (preview) iframe'ini tayyorlab qoyamiz —
     // shu xabardagi boshqa .css/.js fayllar ham avtomatik ichiga qoshib yuboriladi.
     htmlBlocksForPreview.forEach(function (item) {
         const slot = document.getElementById('previewslot_' + item.blockId);
@@ -954,7 +954,7 @@ function renderAIRichText(container, text) {
             card.className = 'file-card';
             card.innerHTML =
                 '<div class="file-card-icon ' + fileIconClass(ext) + '">' +
-                    (ext === 'html' ? 'рџЊђ' : '<span class="file-card-icon-glyph">&lt;/&gt;</span>') +
+                    (ext === 'html' ? '🌐' : '<span class="file-card-icon-glyph">&lt;/&gt;</span>') +
                 '</div>' +
                 '<div class="file-card-info">' +
                     '<div class="file-card-name">' + escapeHtml(fileDisplayName(f.filename)) + '</div>' +
@@ -974,7 +974,7 @@ function renderAIRichText(container, text) {
             const zipBtn = document.createElement('button');
             zipBtn.type = 'button';
             zipBtn.className = 'file-cards-zip-btn';
-            zipBtn.textContent = 'рџ“¦ Barcha ' + groupFiles.length + ' faylni ZIP qilib yuklab olish';
+            zipBtn.textContent = '📦 Barcha ' + groupFiles.length + ' faylni ZIP qilib yuklab olish';
             zipBtn.addEventListener('click', function () {
                 downloadCodeGroupAsZip(groupId, zipBtn);
             });
@@ -1015,7 +1015,7 @@ function buildPreviewHtml(groupFiles, htmlCode) {
 }
 
 function useCodeExamplePrompt(btn) {
-    const text = btn.textContent.replace(/^[^\wРђ-РЇР°-СЏ]+/, '').trim();
+    const text = btn.textContent.replace(/^[^\wА-Яа-я]+/, '').trim();
     const input = document.getElementById('message-input');
     if (input) {
         input.value = text;
@@ -1039,7 +1039,7 @@ function openHtmlInNewTab(html) {
         const url = URL.createObjectURL(blob);
         const win = window.open(url, '_blank');
         if (!win) {
-            showNotificationToast('Brauzer yangi oynani blokladi вЂ” popup blocker\'ni ochib qoying');
+            showNotificationToast('Brauzer yangi oynani blokladi — popup blocker\'ni ochib qoying');
         }
         setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
     } catch (e) {
@@ -1053,7 +1053,7 @@ function toggleCodePreview(blockId) {
     if (!wrap) return;
     const isOpen = wrap.style.display !== 'none';
     wrap.style.display = isOpen ? 'none' : 'block';
-    if (btn) btn.textContent = isOpen ? 'в–¶пёЏ Korish' : 'вЏё Yopish';
+    if (btn) btn.textContent = isOpen ? '▶️ Korish' : '⏸ Yopish';
     if (!isOpen) {
         wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
@@ -1065,7 +1065,7 @@ function copyCodeBlock(id, btn) {
     const text = codeEl.textContent;
     const done = function () {
         const original = btn.textContent;
-        btn.textContent = 'вњ… Nusxalandi';
+        btn.textContent = '✅ Nusxalandi';
         btn.classList.add('copied');
         setTimeout(function () {
             btn.textContent = original;
@@ -1272,7 +1272,7 @@ socket.on('bond_update', function (data) {
     }
 });
 
-/* ---------- AI JAVOBI OQIM (STREAMING) HOLATI вЂ” ChatGPT kabi jonli yozish effekti ---------- */
+/* ---------- AI JAVOBI OQIM (STREAMING) HOLATI — ChatGPT kabi jonli yozish effekti ---------- */
 let activeStreamId = null;
 let activeStreamRow = null;
 let activeStreamTextEl = null;
@@ -1293,7 +1293,7 @@ socket.on('ai_stream_start', function (data) {
     row.className = 'message-row ai-row msg-enter';
     row.setAttribute('data-chat-kind', currentChatKind());
 
-    const avatarHtml = isGrouped ? '<div class="msg-avatar-spacer"></div>' : '<div class="msg-avatar msg-avatar-ai">вљЎ</div>';
+    const avatarHtml = isGrouped ? '<div class="msg-avatar-spacer"></div>' : '<div class="msg-avatar msg-avatar-ai">⚡</div>';
     const nameHtml = isGrouped ? '' : '<strong>Notfic</strong>';
 
     row.innerHTML =
@@ -1342,7 +1342,7 @@ socket.on('ai_stream_done', function (data) {
     activeStreamTextEl = null;
     activeStreamBuffer = '';
 
-    // Xabar ovoz orqali yuborilgan bolsa, javob ham avtomatik ovozda oqiladi вЂ”
+    // Xabar ovoz orqali yuborilgan bolsa, javob ham avtomatik ovozda oqiladi —
     // haqiqiy "ovozli suhbat" tajribasi uchun.
     if (autoSpeakNextAIReply) {
         autoSpeakNextAIReply = false;
@@ -1382,7 +1382,7 @@ function showTypingIndicator() {
     row.className = 'message-row ai-row';
     row.id = 'typing-indicator';
     row.innerHTML =
-        '<div class="msg-avatar msg-avatar-ai">вљЎ</div>' +
+        '<div class="msg-avatar msg-avatar-ai">⚡</div>' +
         '<div class="message-bubble-wrap">' +
             '<strong>Notfic</strong>' +
             '<div class="message typing-indicator"><span class="typing-dots"><span></span><span></span><span></span></span></div>' +
@@ -1533,8 +1533,8 @@ async function loadFriendRequests() {
 
             return '<div class="friend-request-item">' + avatarHtml +
                 '<span class="friend-result-name">' + escapeHtml(r.name) + '</span>' +
-                '<button class="friend-accept-btn" onclick="respondFriendRequest(' + r.request_id + ', \'accept\')">вњ“</button>' +
-                '<button class="friend-reject-btn" onclick="respondFriendRequest(' + r.request_id + ', \'reject\')">вњ•</button>' +
+                '<button class="friend-accept-btn" onclick="respondFriendRequest(' + r.request_id + ', \'accept\')">✓</button>' +
+                '<button class="friend-reject-btn" onclick="respondFriendRequest(' + r.request_id + ', \'reject\')">✕</button>' +
                 '</div>';
         }).join('');
     } catch (e) {
@@ -1579,7 +1579,7 @@ async function loadFriendsListModal() {
                 '<span class="friend-avatar-wrap">' + avatarHtml + '<span class="friend-online-dot' + (f.is_online ? ' online' : '') + '" id="friend-dot-' + f.id + '"></span></span>' +
                 '<span class="friend-result-name">' + escapeHtml(f.name) + '</span>' +
                 '<button class="friend-msg-btn" onclick="switchToFriendFromModal(' + f.id + ')">Yozish</button>' +
-                '<button class="friend-remove-btn" onclick="removeFriend(' + f.id + ', this)" aria-label="Dostlikdan chiqarish">вњ•</button>' +
+                '<button class="friend-remove-btn" onclick="removeFriend(' + f.id + ', this)" aria-label="Dostlikdan chiqarish">✕</button>' +
                 '</div>';
         }).join('');
     } catch (e) {
@@ -1618,7 +1618,7 @@ async function removeFriend(friendId, btnEl) {
 
 async function switchToFriend(friendId, friendName, friendAvatar) {
     setActiveChatId('friend_' + friendId);
-    chatHeaderTitle.textContent = 'рџ‘¤ ' + friendName;
+    chatHeaderTitle.textContent = '👤 ' + friendName;
     document.getElementById('public-chat-item').classList.remove('active');
     closeSidebar();
 
@@ -1634,7 +1634,7 @@ async function switchToFriend(friendId, friendName, friendAvatar) {
         lastRenderedKey = null;
 
         if (msgs.length === 0) {
-            messagesBox.innerHTML = '<div class="empty-state"><h2>' + escapeHtml(friendName) + '</h2><p>Hali xabar yoq, birinchi bolib yozing рџ‘‹<br><span class="ai-hint">Suhbatga AI ni chaqirish uchun xabaringizga @AI deb yozing</span></p></div>';
+            messagesBox.innerHTML = '<div class="empty-state"><h2>' + escapeHtml(friendName) + '</h2><p>Hali xabar yoq, birinchi bolib yozing 👋<br><span class="ai-hint">Suhbatga AI ni chaqirish uchun xabaringizga @AI deb yozing</span></p></div>';
             return;
         }
 
@@ -1758,7 +1758,7 @@ async function loadGroupsListModal() {
 
         el.innerHTML = groups.map(function (g) {
             return '<div class="friend-result-item">' +
-                '<div class="friend-result-avatar profile-avatar-fallback">рџ‘Ґ</div>' +
+                '<div class="friend-result-avatar profile-avatar-fallback">👥</div>' +
                 '<span class="friend-result-name">' + escapeHtml(g.name) + ' <span class="group-member-count">(' + g.member_count + ')</span></span>' +
                 '<button class="friend-msg-btn" onclick="switchToGroupFromModal(' + g.id + ')">Ochish</button>' +
                 '</div>';
@@ -1777,7 +1777,7 @@ function switchToGroupFromModal(groupId) {
 
 async function switchToGroup(groupId, groupName) {
     setActiveChatId('group_' + groupId);
-    chatHeaderTitle.textContent = 'рџ‘Ґ ' + groupName;
+    chatHeaderTitle.textContent = '👥 ' + groupName;
     document.getElementById('public-chat-item').classList.remove('active');
     closeSidebar();
 
@@ -1793,7 +1793,7 @@ async function switchToGroup(groupId, groupName) {
         lastRenderedKey = null;
 
         if (msgs.length === 0) {
-            messagesBox.innerHTML = '<div class="empty-state"><h2>' + escapeHtml(groupName) + '</h2><p>Hali xabar yoq, birinchi bolib yozing рџ‘‹<br><span class="ai-hint">AI ni chaqirish uchun @AI deb yozing</span></p></div>';
+            messagesBox.innerHTML = '<div class="empty-state"><h2>' + escapeHtml(groupName) + '</h2><p>Hali xabar yoq, birinchi bolib yozing 👋<br><span class="ai-hint">AI ni chaqirish uchun @AI deb yozing</span></p></div>';
             return;
         }
 
@@ -1868,7 +1868,7 @@ async function sendSupportMessage() {
         const data = await res.json();
 
         if (data.success) {
-            statusEl.textContent = 'Yuborildi вњ“ Tez orada koriladi';
+            statusEl.textContent = 'Yuborildi ✓ Tez orada koriladi';
             input.value = '';
             setTimeout(function () {
                 statusEl.textContent = '';
@@ -2004,7 +2004,7 @@ function sendMessage() {
 
     chat.messages.push(localData);
     if (!isCodeChat && chat.title === 'Yangi AI suhbat') {
-        chat.title = (message || 'рџ“· Rasm').slice(0, 28) + (message.length > 28 ? '...' : '');
+        chat.title = (message || '📷 Rasm').slice(0, 28) + (message.length > 28 ? '...' : '');
     }
     saveChats(chats);
     renderChatList();
@@ -2034,7 +2034,7 @@ async function enableBrowserNotifications() {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
         localStorage.setItem(NOTIF_PREF_KEY, 'true');
-        showBrowserNotification('Notfic', 'Bildirishnomalar yoqildi вњ“', true);
+        showBrowserNotification('Notfic', 'Bildirishnomalar yoqildi ✓', true);
     } else {
         localStorage.setItem(NOTIF_PREF_KEY, 'false');
     }
@@ -2118,7 +2118,7 @@ async function saveProfile() {
         const data = await res.json();
 
         if (data.success) {
-            statusEl.textContent = 'Saqlandi вњ“';
+            statusEl.textContent = 'Saqlandi ✓';
             const nameEl = document.querySelector('.profile-name');
             if (nameEl) nameEl.textContent = data.name;
             setTimeout(function () { statusEl.textContent = ''; }, 2000);
@@ -2150,7 +2150,7 @@ async function uploadAvatar(input) {
 
         if (data.success) {
             updateAvatarImages(data.avatar);
-            statusEl.textContent = 'Rasm yangilandi вњ“';
+            statusEl.textContent = 'Rasm yangilandi ✓';
             setTimeout(function () { statusEl.textContent = ''; }, 2000);
         } else {
             statusEl.textContent = data.message || 'Xato yuz berdi';
@@ -2172,7 +2172,7 @@ async function removeAvatar() {
 
         if (data.success) {
             updateAvatarImages(data.avatar);
-            statusEl.textContent = 'Odatiy rasmga qaytarildi вњ“';
+            statusEl.textContent = 'Odatiy rasmga qaytarildi ✓';
             setTimeout(function () { statusEl.textContent = ''; }, 2000);
         }
     } catch (e) {
@@ -2205,32 +2205,32 @@ let commandPaletteFiltered = [];
 
 function buildCommandPaletteItems() {
     const items = [
-        { icon: 'рџ¤–', label: 'Yangi AI suhbat', keywords: 'ai suhbat yangi chat yangi suhbat boshla', action: function () { newAIChat(); } },
-        { icon: 'рџ’¬', label: 'Ochiq Suhbat', keywords: 'ochiq suhbat public umumiy suhbat', action: function () { switchToPublic(); } }
+        { icon: '🤖', label: 'Yangi AI suhbat', keywords: 'ai suhbat yangi chat yangi suhbat boshla', action: function () { newAIChat(); } },
+        { icon: '💬', label: 'Ochiq Suhbat', keywords: 'ochiq suhbat public umumiy suhbat', action: function () { switchToPublic(); } }
     ];
 
     if (IS_LOGGED_IN) {
         items.push(
-            { icon: 'рџ‘Ґ', label: "Do'stlar", keywords: 'dostlar dostlarim friends dostim', action: function () { openFriendsModal(); } },
-            { icon: 'рџ‘ЁвЂЌрџ‘©вЂЌрџ‘§', label: 'Guruhlar', keywords: 'guruhlar guruhlarim groups guruh', action: function () { openGroupsModal(); } },
-            { icon: 'вњ…', label: 'Vazifalar', keywords: 'vazifa vazifalar tasks todo eslatma', action: function () { openTasksModal(); } },
-            { icon: 'рџ”–', label: 'Saqlangan xabarlar', keywords: 'saqlangan saqlanganlar saved bukmark', action: function () { openSavedModal(); } },
-            { icon: 'рџ“Љ', label: 'Faoliyatim', keywords: 'faoliyat faoliyatim activity statistika statistikam', action: function () { openActivityModal(); } },
-            { icon: 'вљЎ', label: 'Tezkor buyruqlar', keywords: 'tezkor buyruq prompt tezkor buyruqlar', action: function () { openQuickPromptsModal(); } },
-            { icon: 'рџ‘¤', label: 'Profilim', keywords: 'profil profilim', action: function () { openProfile(); } },
-            { icon: 'рџ›Ў', label: 'Adminga murojaat', keywords: 'admin murojaat support adminga', action: function () { openSupportModal(); } }
+            { icon: '👥', label: "Do'stlar", keywords: 'dostlar dostlarim friends dostim', action: function () { openFriendsModal(); } },
+            { icon: '👨‍👩‍👧', label: 'Guruhlar', keywords: 'guruhlar guruhlarim groups guruh', action: function () { openGroupsModal(); } },
+            { icon: '✅', label: 'Vazifalar', keywords: 'vazifa vazifalar tasks todo eslatma', action: function () { openTasksModal(); } },
+            { icon: '🔖', label: 'Saqlangan xabarlar', keywords: 'saqlangan saqlanganlar saved bukmark', action: function () { openSavedModal(); } },
+            { icon: '📊', label: 'Faoliyatim', keywords: 'faoliyat faoliyatim activity statistika statistikam', action: function () { openActivityModal(); } },
+            { icon: '⚡', label: 'Tezkor buyruqlar', keywords: 'tezkor buyruq prompt tezkor buyruqlar', action: function () { openQuickPromptsModal(); } },
+            { icon: '👤', label: 'Profilim', keywords: 'profil profilim', action: function () { openProfile(); } },
+            { icon: '🛡', label: 'Adminga murojaat', keywords: 'admin murojaat support adminga', action: function () { openSupportModal(); } }
         );
     }
 
     items.push(
-        { icon: 'рџ“ў', label: 'Yangiliklar', keywords: 'yangilik yangiliklar elon elonlar news', action: function () { openAnnouncementsModal(); } },
-        { icon: 'рџ“±', label: 'Ilovalar', keywords: 'ilova ilovalar apps', action: function () { openAppsModal(); } },
-        { icon: 'вљ™пёЏ', label: 'Sozlamalar', keywords: 'sozlama sozlamalar settings', action: function () { openSettings(); } },
-        { icon: 'рџЊ—', label: 'Mavzuni almashtirish', keywords: 'mavzu mavzuni tema rangni almashtir', action: function () { toggleTheme(); } }
+        { icon: '📢', label: 'Yangiliklar', keywords: 'yangilik yangiliklar elon elonlar news', action: function () { openAnnouncementsModal(); } },
+        { icon: '📱', label: 'Ilovalar', keywords: 'ilova ilovalar apps', action: function () { openAppsModal(); } },
+        { icon: '⚙️', label: 'Sozlamalar', keywords: 'sozlama sozlamalar settings', action: function () { openSettings(); } },
+        { icon: '🌗', label: 'Mavzuni almashtirish', keywords: 'mavzu mavzuni tema rangni almashtir', action: function () { toggleTheme(); } }
     );
 
     if (IS_LOGGED_IN) {
-        items.push({ icon: 'рџљЄ', label: 'Chiqish', keywords: 'chiqish logout hisobdan chiq', action: function () { window.location.href = '/auth/logout'; } });
+        items.push({ icon: '🚪', label: 'Chiqish', keywords: 'chiqish logout hisobdan chiq', action: function () { window.location.href = '/auth/logout'; } });
     }
 
     return items;
@@ -2386,8 +2386,6 @@ const VOICE_ASSISTANT_KEY = 'notfic_voice_assistant_enabled';
 let voiceRecognition = null;
 let voiceAssistantActive = false;
 let voiceRestartTimer = null;
-let voiceFollowUpUntil = 0;
-const VOICE_FOLLOWUP_MS = 12000;
 
 function isVoiceAssistantSupported() {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
@@ -2538,34 +2536,24 @@ function handleVoiceCommand(transcript) {
     let text = transcript.toLowerCase().trim();
     if (!text) return;
 
-    // Sof salomlashuv вЂ” tabiiy javob
+    // Sof salomlashuv — tabiiy javob
     if (/^(salom|salomlar|assalomu[\s']?alaykum|salom notfic)[\s!.,]*$/.test(text)) {
         speakOnboardingText('Salom, qalaysiz? Sizga qanday yordam bera olaman?', 'happy');
-        voiceFollowUpUntil = Date.now() + VOICE_FOLLOWUP_MS;
         return;
     }
 
     const hadWakeWord = containsWakeWord(text);
-    // Jarvis uslubidagi ketma-ket suhbat: chaqiruv sozidan song bir necha soniya ichida
-    // yana "Hey Notfic" demasdan davom eting deyish mumkin.
-    const inFollowUp = Date.now() < voiceFollowUpUntil;
-
     if (hadWakeWord) {
         text = stripWakeWord(text).trim();
     }
 
     if (hadWakeWord && text.length === 0) {
         speakOnboardingText('Hey sir! Tinglayapman, buyruq bering.', 'happy');
-        showNotificationToast('рџЋ™ Hey sir! Tinglayapman...');
-        voiceFollowUpUntil = Date.now() + VOICE_FOLLOWUP_MS;
+        showNotificationToast('🎙 Hey sir! Tinglayapman...');
         return;
     }
 
     if (!text) return;
-
-    if (hadWakeWord || inFollowUp) {
-        voiceFollowUpUntil = Date.now() + VOICE_FOLLOWUP_MS;
-    }
 
     // Tinglashni tokhtatish
     if (/tinglashni tokhtat|ovozni ochir|meni eshitma|sukut/.test(text)) {
@@ -2579,7 +2567,7 @@ function handleVoiceCommand(transcript) {
         const now = new Date();
         const timeStr = now.getHours() + ' soat ' + now.getMinutes() + ' daqiqa';
         speakOnboardingText('Hozir soat ' + timeStr);
-        showNotificationToast('рџ•ђ ' + timeStr);
+        showNotificationToast('🕐 ' + timeStr);
         return;
     }
 
@@ -2587,7 +2575,7 @@ function handleVoiceCommand(transcript) {
     if (/nima qila olasan|yordam ber|komandalar|buyruqlar royxati/.test(text)) {
         const helpText = "Men do'stlar, guruhlar, vazifalar, sozlamalar bolimlarini ochishim, vazifa qoshib-bajarishim, dost bilan suhbat ochishim, mavzuni ozgartirishim va sizning xabaringizni AI'ga yuborishim mumkin.";
         speakOnboardingText(helpText, 'happy');
-        showNotificationToast('рџЋ™ ' + helpText);
+        showNotificationToast('🎙 ' + helpText);
         return;
     }
 
@@ -2639,7 +2627,7 @@ function handleVoiceCommand(transcript) {
             body: JSON.stringify({ text: taskText })
         }).then(function () {
             speakOnboardingText('Vazifa qoshildi: ' + taskText, 'happy');
-            showNotificationToast('вњ… Vazifa qoshildi: ' + taskText);
+            showNotificationToast('✅ Vazifa qoshildi: ' + taskText);
         }).catch(function (e) { console.error(e); });
         return;
     }
@@ -2717,7 +2705,7 @@ function handleVoiceCommand(transcript) {
         const keywordList = items[i].keywords.split(' ');
         for (let j = 0; j < keywordList.length; j++) {
             if (keywordList[j].length > 2 && text.indexOf(keywordList[j]) !== -1) {
-                showNotificationToast('рџЋ™ Bajarilmoqda: ' + items[i].label);
+                showNotificationToast('🎙 Bajarilmoqda: ' + items[i].label);
                 speakOnboardingText(items[i].label + ' ochilmoqda.', 'happy');
                 items[i].action();
                 return;
@@ -2725,24 +2713,21 @@ function handleVoiceCommand(transcript) {
         }
     }
 
-    // Hech narsa mos kelmasa вЂ” chaqiruv sozi ("Hey Notfic") aytilgan yoki hozir
-    // "ketma-ket suhbat" oynasida bolsak davom etamiz, aks holda etibor bermaymiz
-    if (!hadWakeWord && !inFollowUp) return;
+    // Hech narsa mos kelmasa — faqat chaqiruv sozi ("Hey Notfic") aytilgan bolsa etibor beramiz
+    if (!hadWakeWord) return;
 
     // Juda qisqa/tushunarsiz gap bolsa, qayta soralaydi
     if (text.length < 4 || text.split(' ').length === 1) {
         speakOnboardingText('Kechirasiz, tushunmadim. Iltimos qayta gapiring.', 'annoyed');
-        voiceFollowUpUntil = Date.now() + VOICE_FOLLOWUP_MS;
         return;
     }
 
-    // Aks holda вЂ” xabar sifatida AI'ga yuboriladi, javob ham ovozda oqiladi
+    // Aks holda — xabar sifatida AI'ga yuboriladi
     const messageInput = document.getElementById('message-input');
     if (messageInput) {
         messageInput.value = text;
-        autoSpeakNextAIReply = true;
         sendMessage();
-        showNotificationToast('рџЋ™ Xabar sifatida yuborildi');
+        showNotificationToast('🎙 Xabar sifatida yuborildi');
     }
 }
 
@@ -2870,7 +2855,7 @@ async function loadTasks() {
             return '<div class="task-item">' +
                 '<input type="checkbox" ' + (t.is_done ? 'checked' : '') + ' onchange="toggleTask(' + t.id + ')">' +
                 '<span class="task-text' + (t.is_done ? ' done' : '') + '">' + escapeHtml(t.text) + '</span>' +
-                '<button class="task-delete-btn" onclick="deleteTask(' + t.id + ')" aria-label="Ochirish">вњ•</button>' +
+                '<button class="task-delete-btn" onclick="deleteTask(' + t.id + ')" aria-label="Ochirish">✕</button>' +
                 '</div>';
         }).join('');
     } catch (e) {
@@ -2944,7 +2929,7 @@ async function loadSavedMessages() {
         el.innerHTML = items.map(function (s) {
             return '<div class="task-item saved-item">' +
                 '<span class="task-text">' + escapeHtml(s.content) + '</span>' +
-                '<button class="task-delete-btn" onclick="deleteSavedMessage(' + s.id + ')" aria-label="Ochirish">вњ•</button>' +
+                '<button class="task-delete-btn" onclick="deleteSavedMessage(' + s.id + ')" aria-label="Ochirish">✕</button>' +
                 '</div>';
         }).join('');
     } catch (e) {
@@ -2997,7 +2982,7 @@ async function loadActivity() {
 
         el.innerHTML =
             '<div class="activity-stat-grid">' +
-                '<div class="activity-stat"><span class="activity-stat-value">рџ”Ґ ' + data.streak_count + '</span><span class="activity-stat-label">Kunlik ketma-ketlik</span></div>' +
+                '<div class="activity-stat"><span class="activity-stat-value">🔥 ' + data.streak_count + '</span><span class="activity-stat-label">Kunlik ketma-ketlik</span></div>' +
                 '<div class="activity-stat"><span class="activity-stat-value">' + data.friends_count + '</span><span class="activity-stat-label">Dostlar</span></div>' +
                 '<div class="activity-stat"><span class="activity-stat-value">' + data.groups_count + '</span><span class="activity-stat-label">Guruhlar</span></div>' +
                 '<div class="activity-stat"><span class="activity-stat-value">' + data.friend_messages_sent + '</span><span class="activity-stat-label">Dostlarga xabarlar</span></div>' +
@@ -3043,8 +3028,8 @@ async function loadQuickPrompts() {
         // Boglanish darajasi 3+ bolganda maxsus, shaxsiylashtirilgan taklif ochiladi
         if (currentBondInfo && currentBondInfo.level >= 3) {
             items.push({
-                label: 'рџЋЇ Meni yaxshi bilib maslahat ber',
-                prompt: 'Biz allaqachon bir-birimizni bilamiz вЂ” oldingi suhbatlarimizga tayanib, menga hozir eng foydali bolishi mumkin bolgan maslahat yoki gapni ayt.'
+                label: '🎯 Meni yaxshi bilib maslahat ber',
+                prompt: 'Biz allaqachon bir-birimizni bilamiz — oldingi suhbatlarimizga tayanib, menga hozir eng foydali bolishi mumkin bolgan maslahat yoki gapni ayt.'
             });
         }
 
@@ -3203,7 +3188,7 @@ function showStreakCelebration(streak) {
             '<div class="mascot-head"><div class="mascot-eye"></div><div class="mascot-eye"></div></div>' +
         '</div>' +
         '<div class="streak-celebration-bubble">' +
-            '<p>рџ”Ґ ' + streak + ' kunlik ketma-ketlik! Har kuni kelib turganingiz uchun rahmat, davom eting!</p>' +
+            '<p>🔥 ' + streak + ' kunlik ketma-ketlik! Har kuni kelib turganingiz uchun rahmat, davom eting!</p>' +
             '<button class="onboarding-next-btn" onclick="this.closest(\'.streak-celebration-overlay\').remove()">Rahmat!</button>' +
         '</div>';
     document.body.appendChild(overlay);
@@ -3216,7 +3201,7 @@ function showStreakCelebration(streak) {
     }, 8000);
 }
 
-/* ---------- BIRINCHI KIRISH вЂ” AI YORDAMCHISI TANISHTIRUVI ---------- */
+/* ---------- BIRINCHI KIRISH — AI YORDAMCHISI TANISHTIRUVI ---------- */
 const ONBOARDING_STEPS = [
     "Salom! Men Notfic sun'iy intellektiman. Hozir sizga ilovani qisqacha tanishtiraman.",
     "Pastdagi maydonchaga yozib, men bilan istalgan mavzuda suhbatlashishingiz mumkin.",
@@ -3247,16 +3232,6 @@ async function speakOnboardingText(text, mood) {
         currentTtsAudio = null;
     }
 
-    const mic = document.getElementById('voice-mic-btn');
-    if (mic) mic.classList.add('speaking');
-
-    const onSpeechEnd = function () {
-        if (mic) mic.classList.remove('speaking');
-        if (wasListening && isVoiceAssistantEnabled()) {
-            setTimeout(startVoiceListening, 400);
-        }
-    };
-
     try {
         const res = await fetch('/api/tts', {
             method: 'POST',
@@ -3270,7 +3245,9 @@ async function speakOnboardingText(text, mood) {
             currentTtsAudio = new Audio(url);
             currentTtsAudio.onended = function () {
                 URL.revokeObjectURL(url);
-                onSpeechEnd();
+                if (wasListening && isVoiceAssistantEnabled()) {
+                    setTimeout(startVoiceListening, 400);
+                }
             };
             currentTtsAudio.onerror = currentTtsAudio.onended;
             currentTtsAudio.play();
@@ -3280,14 +3257,11 @@ async function speakOnboardingText(text, mood) {
         console.error(e);
     }
 
-    speakWithBrowserVoice(text, wasListening, onSpeechEnd);
+    speakWithBrowserVoice(text, wasListening);
 }
 
-function speakWithBrowserVoice(text, wasListening, onEnd) {
-    if (!('speechSynthesis' in window)) {
-        if (onEnd) onEnd();
-        return;
-    }
+function speakWithBrowserVoice(text, wasListening) {
+    if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -3301,7 +3275,9 @@ function speakWithBrowserVoice(text, wasListening, onEnd) {
     else if (ruVoice) utterance.voice = ruVoice;
 
     utterance.onend = function () {
-        if (onEnd) onEnd();
+        if (wasListening && isVoiceAssistantEnabled()) {
+            setTimeout(startVoiceListening, 400);
+        }
     };
     utterance.onerror = utterance.onend;
 
@@ -3388,8 +3364,8 @@ function isStandaloneMode() {
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
-const DESKTOP_DOWNLOAD_URL = '/download/desktop';
-const ANDROID_DOWNLOAD_URL = '/download/android';
+const DESKTOP_DOWNLOAD_URL = 'https://github.com/salohiddinbtrv-star/notfic-desktop/releases/latest';
+const ANDROID_DOWNLOAD_URL = 'https://github.com/salohiddinbtrv-star/notfic-android/releases/latest';
 
 function isElectronApp() {
     return navigator.userAgent.toLowerCase().indexOf('electron') !== -1;

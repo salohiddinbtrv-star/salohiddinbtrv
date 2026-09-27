@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel — Notfic</title>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <title>Admin Panel вЂ” Notfic</title>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/admin.css?v={{ v }}">
 </head>
 <body>
@@ -23,27 +23,27 @@
 
             <div class="stats-grid">
                 <div class="stat-card">
-                    <span class="stat-label">🟢 Hozir onlayn</span>
+                    <span class="stat-label">рџџў Hozir onlayn</span>
                     <span class="stat-value" id="stat-online">{{ online_count }}</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-label">👥 Jami foydalanuvchilar</span>
+                    <span class="stat-label">рџ‘Ґ Jami foydalanuvchilar</span>
                     <span class="stat-value" id="stat-users">{{ total_users }}</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-label">💬 Ochiq suhbat xabarlari</span>
+                    <span class="stat-label">рџ’¬ Ochiq suhbat xabarlari</span>
                     <span class="stat-value" id="stat-public">{{ total_public }}</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-label">🤖 AI suhbatlari</span>
+                    <span class="stat-label">рџ¤– AI suhbatlari</span>
                     <span class="stat-value" id="stat-ai">{{ total_ai }}</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-label">⏱ Server ishlab turgan vaqt</span>
+                    <span class="stat-label">вЏ± Server ishlab turgan vaqt</span>
                     <span class="stat-value stat-value-sm" id="stat-uptime">{{ uptime }}</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-label">⚡ AI holati</span>
+                    <span class="stat-label">вљЎ AI holati</span>
                     <span class="stat-value stat-value-sm">
                         {% if ai_connected %}
                             <span class="status-ok">Ulangan</span>
@@ -56,25 +56,25 @@
 
             <div class="stats-grid stats-grid-secondary">
                 <div class="stat-card">
-                    <span class="stat-label">👍 AI qoniqish darajasi</span>
-                    <span class="stat-value stat-value-sm" id="stat-ai-satisfaction">—</span>
+                    <span class="stat-label">рџ‘Ќ AI qoniqish darajasi</span>
+                    <span class="stat-value stat-value-sm" id="stat-ai-satisfaction">вЂ”</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-label">🎯 Shaxsiylashtirilgan foydalanuvchilar</span>
-                    <span class="stat-value stat-value-sm" id="stat-personalized-users">—</span>
+                    <span class="stat-label">рџЋЇ Shaxsiylashtirilgan foydalanuvchilar</span>
+                    <span class="stat-value stat-value-sm" id="stat-personalized-users">вЂ”</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-label">🤝 Jami dostliklar</span>
-                    <span class="stat-value stat-value-sm" id="stat-friendships">—</span>
+                    <span class="stat-label">рџ¤ќ Jami dostliklar</span>
+                    <span class="stat-value stat-value-sm" id="stat-friendships">вЂ”</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-label">⏳ Kutilayotgan sorovlar</span>
-                    <span class="stat-value stat-value-sm" id="stat-pending-requests">—</span>
+                    <span class="stat-label">вЏі Kutilayotgan sorovlar</span>
+                    <span class="stat-value stat-value-sm" id="stat-pending-requests">вЂ”</span>
                 </div>
             </div>
 
             <section class="history-section">
-                <h2>📢 Ommaviy e'lon yuborish</h2>
+                <h2>рџ“ў Ommaviy e'lon yuborish</h2>
                 <p class="section-hint">Ochiq Suhbatda darhol korinadi va "Yangiliklar" bolimida doimiy saqlanadi.</p>
                 <input type="text" id="broadcast-title-input" class="user-search-input" placeholder="Sarlavha (ixtiyoriy)" maxlength="150">
                 <div class="broadcast-form">
@@ -87,7 +87,7 @@
             <section class="history-section">
                 <div class="section-header-row">
                     <h2>Foydalanuvchilar</h2>
-                    <button class="danger-btn danger-btn-outline" onclick="exportUsers()">⬇ Eksport (JSON)</button>
+                    <button class="danger-btn danger-btn-outline" onclick="exportUsers()">в¬‡ Eksport (JSON)</button>
                 </div>
                 <input type="text" id="user-search" class="user-search-input" placeholder="Ism yoki email boyicha qidirish..." oninput="loadUsers()">
                 <div class="user-list" id="user-list"></div>
@@ -112,15 +112,15 @@
 
             <section class="history-section">
                 <div class="section-header-row">
-                    <h2>📩 Foydalanuvchi murojaatlari</h2>
+                    <h2>рџ“© Foydalanuvchi murojaatlari</h2>
                     <span id="support-count-badge" class="support-count-badge" style="display:none"></span>
                 </div>
                 <div class="history-list" id="support-list"></div>
             </section>
 
             <section class="history-section">
-                <h2>🛡 Audit jurnali</h2>
-                <p class="section-hint">Barcha admin amallarining xavfsizlik yozuvlari — kim, qachon, nima qildi.</p>
+                <h2>рџ›Ў Audit jurnali</h2>
+                <p class="section-hint">Barcha admin amallarining xavfsizlik yozuvlari вЂ” kim, qachon, nima qildi.</p>
                 <div class="history-list" id="audit-log-list"></div>
             </section>
 
@@ -162,7 +162,7 @@
                 const res = await fetch('/admin/api/ai-stats');
                 const data = await res.json();
                 document.getElementById('stat-ai-satisfaction').textContent =
-                    data.satisfaction_percent === null ? "Hali baholanmagan" : data.satisfaction_percent + '% (' + data.total_likes + ' 👍 / ' + data.total_dislikes + ' 👎)';
+                    data.satisfaction_percent === null ? "Hali baholanmagan" : data.satisfaction_percent + '% (' + data.total_likes + ' рџ‘Ќ / ' + data.total_dislikes + ' рџ‘Ћ)';
                 document.getElementById('stat-personalized-users').textContent = data.personalized_users;
             } catch (e) {
                 console.error(e);
@@ -196,7 +196,7 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    statusEl.textContent = 'Yuborildi ✓';
+                    statusEl.textContent = 'Yuborildi вњ“';
                     input.value = '';
                     titleInput.value = '';
                     loadAuditLog();
@@ -231,7 +231,7 @@
                             '<button class="danger-btn" onclick="deleteUser(' + u.id + ', \'' + safeName + '\')">Ochirish</button>';
                     }
                     return '<div class="user-item">' +
-                        '<span class="user-item-name">' + u.name + (u.is_admin ? ' 👑' : '') + '</span>' +
+                        '<span class="user-item-name">' + u.name + (u.is_admin ? ' рџ‘‘' : '') + '</span>' +
                         '<span class="user-item-email">' + u.email + '</span>' +
                         actionsHtml +
                         '</div>';
@@ -352,7 +352,7 @@
                 }
 
                 el.innerHTML = entries.map(function (e) {
-                    return '<div class="history-item"><span class="history-time">' + e.time + '</span><strong>' + e.action + '</strong>' + (e.detail ? ' — ' + e.detail : '') + '</div>';
+                    return '<div class="history-item"><span class="history-time">' + e.time + '</span><strong>' + e.action + '</strong>' + (e.detail ? ' вЂ” ' + e.detail : '') + '</div>';
                 }).join('');
             } catch (e) {
                 console.error(e);
